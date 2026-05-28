@@ -1,5 +1,8 @@
 // Puffin Cruises backend: Stripe checkout + webhook + Supabase persistence.
 
+import { createOpenSslCompatiblePkcs7Signature } from "@swapnanildhol/passkit-pkcs7-signature";
+import { Buffer } from "node:buffer";
+
 const STRIPE_TIMESTAMP_TOLERANCE_SEC = 300;
 
 type Env = {
@@ -12,6 +15,9 @@ type Env = {
   APPLE_PASS_CERT_P12_BASE64?: string;
   APPLE_PASS_CERT_PASSWORD?: string;
   APPLE_WWDR_CERT_BASE64?: string;
+  APPLE_SIGNER_CERT_PEM?: string;
+  APPLE_SIGNER_KEY_PKCS8_PEM?: string;
+  APPLE_WWDR_PEM?: string;
 };
 
 const APPLE_PASS_TYPE_ID = "pass.com.puffincruises.boarding";
@@ -207,20 +213,26 @@ async function handleWalletPass(request: Request, env: Env): Promise<Response> {
   const manifestJson = JSON.stringify(manifest);
   files.push(addFile("manifest.json", encoder.encode(manifestJson)));
 
-  // Apple Wallet requires this file to be a CMS signature of manifest.json.
-  // The certificate values are intentionally kept as private runtime secrets, never in the app bundle.
-  if (!env.APPLE_PASS_CERT_P12_BASE64 || !env.APPLE_PASS_CERT_PASSWORD || !env.APPLE_WWDR_CERT_BASE64) {
+  // Apple Wallet requires this file to be a detached PKCS#7/CMS signature of manifest.json.
+  // Signing material is read only from private backend secrets, never from the mobile bundle.
+  const signingMaterial = getWalletSigningMaterial(env);
+  if (!signingMaterial) {
     return json(
       {
         error: "wallet_signing_not_configured",
-        message: "Apple Wallet signing secrets need to be added to the backend environment.",
+        message: "Apple Wallet signing PEM secrets need to be added to the backend environment.",
       },
       { status: 503 },
     );
   }
 
-  const sigPlaceholder = encoder.encode("wallet-signing-pending-server-cms-signature");
-  files.push(addFile("signature", sigPlaceholder));
+  const signature = await createOpenSslCompatiblePkcs7Signature({
+    manifest: manifestJson,
+    signerCertPem: signingMaterial.signerCertPem,
+    privateKeyPkcs8Pem: signingMaterial.privateKeyPkcs8Pem,
+    wwdrPem: signingMaterial.wwdrPem,
+  });
+  files.push(addFile("signature", signature));
 
   // Central directory
   let cdOffset = 0;
@@ -275,6 +287,37 @@ async function handleWalletPass(request: Request, env: Env): Promise<Response> {
       "Content-Disposition": `attachment; filename="${booking.id}.pkpass"`,
     },
   });
+}
+
+type WalletSigningMaterial = {
+  signerCertPem: string;
+  privateKeyPkcs8Pem: string;
+  wwdrPem: string;
+};
+
+function getWalletSigningMaterial(env: Env): WalletSigningMaterial | null {
+  const signerCertPem = normalizePemSecret(env.APPLE_SIGNER_CERT_PEM);
+  const privateKeyPkcs8Pem = normalizePemSecret(env.APPLE_SIGNER_KEY_PKCS8_PEM);
+  const wwdrPem = normalizePemSecret(env.APPLE_WWDR_PEM) ?? certBase64ToPem(env.APPLE_WWDR_CERT_BASE64);
+
+  if (!signerCertPem || !privateKeyPkcs8Pem || !wwdrPem) return null;
+  return { signerCertPem, privateKeyPkcs8Pem, wwdrPem };
+}
+
+function normalizePemSecret(value?: string): string | null {
+  const trimmed = value?.trim();
+  if (!trimmed) return null;
+  return trimmed.includes("-----BEGIN") ? trimmed.replace(/\\n/g, "\n") : trimmed;
+}
+
+function certBase64ToPem(value?: string): string | null {
+  const trimmed = value?.trim();
+  if (!trimmed) return null;
+  const base64 = trimmed.includes("-----BEGIN")
+    ? Buffer.from(trimmed).toString("base64")
+    : trimmed.replace(/\s/g, "");
+  const body = base64.match(/.{1,64}/g)?.join("\n");
+  return body ? `-----BEGIN CERTIFICATE-----\n${body}\n-----END CERTIFICATE-----` : null;
 }
 
 async function sha1(input: string): Promise<string> {

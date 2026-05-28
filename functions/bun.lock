@@ -1,0 +1,15 @@
+{
+  "lockfileVersion": 1,
+  "configVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "rork-functions",
+      "dependencies": {
+        "@swapnanildhol/passkit-pkcs7-signature": "^0.1.0",
+      },
+    },
+  },
+  "packages": {
+    "@swapnanildhol/passkit-pkcs7-signature": ["@swapnanildhol/passkit-pkcs7-signature@0.1.0", "", {}, "sha512-10K6O88mrzf5EHm6FyLllr6qdoswVCbHWTXyyD70+4VTD0ZfUbT7pC5zbYnSH4O7FHGDzmzeGbm8iX2JHBR6Fg=="],
+  }
+}
