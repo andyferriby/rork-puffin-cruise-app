@@ -106,6 +106,22 @@ async function stripeFetch(env: Env, path: string, body: Record<string, string |
   return data;
 }
 
+async function stripeGet(env: Env, path: string): Promise<unknown> {
+  if (!env.STRIPE_SECRET_KEY) {
+    throw new StripeApiError(0, { message: "STRIPE_SECRET_KEY not set" });
+  }
+  const res = await fetch(`https://api.stripe.com/v1${path}`, {
+    method: "GET",
+    headers: { Authorization: `Bearer ${env.STRIPE_SECRET_KEY}` },
+  });
+  const data = (await res.json()) as unknown;
+  if (!res.ok) {
+    console.error("stripe error", path, res.status, data);
+    throw new StripeApiError(res.status, data);
+  }
+  return data;
+}
+
 async function supa(env: Env, path: string, init: RequestInit & { body?: string }): Promise<Response> {
   return fetch(`${env.EXPO_PUBLIC_SUPABASE_URL}/rest/v1${path}`, {
     ...init,
@@ -194,8 +210,10 @@ async function handleWalletPass(request: Request, env: Env): Promise<Response> {
   function addFile(name: string, content: Uint8Array) {
     const nameBytes = encoder.encode(name);
     const header = new Uint8Array(30 + nameBytes.length);
+    const localHeaderOffset = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
     const dv = new DataView(header.buffer);
     dv.setUint32(0, 0x04034b50, true); // local file header signature
+    dv.setUint16(4, 20, true); // version needed to extract
     dv.setUint16(8, 0, true); // compression: none
     dv.setUint32(14, crc32(content), true);
     dv.setUint32(18, content.length, true);
@@ -206,10 +224,10 @@ async function handleWalletPass(request: Request, env: Env): Promise<Response> {
     chunks.push(nameBytes);
     chunks.push(content);
 
-    return { name, header, content };
+    return { name, header, content, localHeaderOffset };
   }
 
-  const files: { name: string; header: Uint8Array; content: Uint8Array }[] = [];
+  const files: { name: string; header: Uint8Array; content: Uint8Array; localHeaderOffset: number }[] = [];
   files.push(addFile("pass.json", encoder.encode(passJson)));
 
   const manifestJson = JSON.stringify(manifest);
@@ -258,7 +276,7 @@ async function handleWalletPass(request: Request, env: Env): Promise<Response> {
     dv.setUint16(32, 0, true);
     dv.setUint32(34, 0, true);
     dv.setUint32(38, 0, true);
-    dv.setUint32(42, 0, true);
+    dv.setUint32(42, f.localHeaderOffset, true);
     chunks.push(cd);
     chunks.push(nameBytes);
   }
@@ -528,7 +546,7 @@ async function handleCheckout(request: Request, env: Env): Promise<Response> {
   const origin = new URL(request.url).origin;
   const params: Record<string, string | number> = {
     mode: "payment",
-    success_url: `${origin}/booking/success?booking=${booking.id}`,
+    success_url: `${origin}/booking/success?booking=${booking.id}&session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${origin}/booking/cancel?booking=${booking.id}`,
     customer_email: body.customerEmail,
     "metadata[booking_id]": booking.id,
@@ -629,7 +647,16 @@ export default {
     }
 
     if (url.pathname === "/booking/success") {
-      return new Response(successHtml(url.searchParams.get("booking") ?? ""), {
+      const bookingId = url.searchParams.get("booking") ?? "";
+      const sessionId = url.searchParams.get("session_id") ?? "";
+      if (bookingId && sessionId) {
+        try {
+          await confirmPaidBookingFromCheckoutSession(env, bookingId, sessionId);
+        } catch (err) {
+          console.error("success confirmation error", err);
+        }
+      }
+      return new Response(successHtml(bookingId), {
         headers: { "Content-Type": "text/html; charset=utf-8" },
       });
     }
@@ -642,6 +669,28 @@ export default {
     return json({ ok: true });
   },
 } satisfies ExportedHandler<Env>;
+
+async function confirmPaidBookingFromCheckoutSession(env: Env, bookingId: string, sessionId: string): Promise<void> {
+  const session = (await stripeGet(env, `/checkout/sessions/${encodeURIComponent(sessionId)}`)) as {
+    id: string;
+    payment_status?: string;
+    metadata?: { booking_id?: string };
+    payment_intent?: string | null;
+  };
+
+  if (session.payment_status !== "paid" || session.metadata?.booking_id !== bookingId) {
+    console.warn("success confirmation ignored", { bookingId, sessionId: session.id, paymentStatus: session.payment_status });
+    return;
+  }
+
+  await supa(env, `/bookings?id=eq.${encodeURIComponent(bookingId)}`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      status: "paid",
+      stripe_payment_intent: session.payment_intent ?? null,
+    }),
+  });
+}
 
 function shell(title: string, inner: string): string {
   return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title><style>body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'SF Pro',system-ui,sans-serif;background:linear-gradient(180deg,#0B2A4A,#0E4D7A);color:#fff;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;text-align:center}.card{max-width:420px;background:rgba(255,255,255,0.08);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,0.15);border-radius:24px;padding:32px}h1{margin:0 0 12px;font-size:28px}p{margin:0 0 8px;opacity:.85;line-height:1.5}.emoji{font-size:56px;margin-bottom:8px}</style></head><body><div class="card">${inner}</div></body></html>`;
