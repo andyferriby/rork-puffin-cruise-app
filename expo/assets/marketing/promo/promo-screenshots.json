@@ -1,5 +1,9 @@
 {
-  "style": "Clean App Store cards inspired by the supplied references: cream/coastal backgrounds, bold dark headlines, phone mockups, soft shadows, and puffin orange/sea-blue accents.",
+  "style": "Full iPhone-background promo artwork: each app screen fills the whole vertical image as a blurred coastal backdrop, with a large integrated iPhone-style panel, bold headline, glass caption card, and puffin orange/sea-blue accents.",
+  "format": {
+    "appStoreImages": "1320x2868 PNG",
+    "facebookImage": "1600x1600 PNG"
+  },
   "items": [
     {
       "file": "promo/01-book-your-island-cruise.png",
