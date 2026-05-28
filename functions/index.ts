@@ -461,7 +461,13 @@ async function getPushTokens(env: Env): Promise<{ tokens: StoredPushToken[]; raw
   const configRes = await supa(env, `/app_config?key=eq.push_tokens&select=value`, { method: "GET" });
   if (!configRes.ok) return { tokens: [], raw: {} };
   const rows = (await configRes.json()) as { value: unknown }[];
-  const raw = (rows[0]?.value ?? {}) as Record<string, unknown>;
+  const value = rows[0]?.value;
+
+  // Tolerate both shapes: a legacy raw array, or the object { tokens: [...] }.
+  if (Array.isArray(value)) {
+    return { tokens: value as StoredPushToken[], raw: {} };
+  }
+  const raw = (value ?? {}) as Record<string, unknown>;
   const tokens: StoredPushToken[] = Array.isArray(raw?.tokens) ? (raw.tokens as StoredPushToken[]) : [];
   return { tokens, raw };
 }

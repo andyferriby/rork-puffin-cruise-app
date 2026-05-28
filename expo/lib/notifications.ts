@@ -78,16 +78,26 @@ export async function linkDeviceToEmail(email: string): Promise<void> {
 }
 
 async function storeToken(token: string): Promise<void> {
-  // Read existing tokens from app_config
+  // Read existing config from app_config. The backend expects the shape
+  // { tokens: PushToken[], ...meta }, so we always read/write that object
+  // (tolerating a legacy raw-array value for backwards compatibility).
   const { data } = await supabase
     .from("app_config")
     .select("value")
     .eq("key", "push_tokens")
     .maybeSingle();
 
-  const existing: PushToken[] = Array.isArray(data?.value)
-    ? (data.value as PushToken[])
-    : [];
+  const value = data?.value as unknown;
+  const raw: Record<string, unknown> =
+    value && typeof value === "object" && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : {};
+  const existing: PushToken[] = Array.isArray(value)
+    ? (value as PushToken[])
+    : Array.isArray((raw as { tokens?: unknown }).tokens)
+      ? ((raw as { tokens: PushToken[] }).tokens)
+      : [];
+
   const filtered = existing.filter((t) => t.token !== token);
   filtered.push({
     token,
@@ -99,7 +109,10 @@ async function storeToken(token: string): Promise<void> {
   const trimmed = filtered.slice(-500);
 
   await supabase.from("app_config").upsert(
-    { key: "push_tokens", value: trimmed as unknown as Record<string, unknown> },
+    {
+      key: "push_tokens",
+      value: { ...raw, tokens: trimmed } as unknown as Record<string, unknown>,
+    },
     { onConflict: "key" },
   );
 }
