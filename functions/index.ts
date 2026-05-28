@@ -19,6 +19,7 @@ type Env = {
   APPLE_SIGNER_KEY_PKCS8_PEM?: string;
   APPLE_WWDR_PEM?: string;
   RESEND_API_KEY?: string;
+  RESEND_FROM_EMAIL?: string;
 };
 
 const APPLE_PASS_TYPE_ID = "pass.com.puffincruises.boarding";
@@ -364,6 +365,8 @@ async function sendBookingConfirmationEmail(
     booking.children > 0 ? `${booking.children} child${booking.children === 1 ? "" : "ren"}` : null,
   ].filter(Boolean).join(", ");
 
+  const fromEmail = env.RESEND_FROM_EMAIL?.trim() || "bookings@puffincruises.com";
+
   try {
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
@@ -372,7 +375,7 @@ async function sendBookingConfirmationEmail(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from: "Puffin Cruises <bookings@puffincruises.com>",
+        from: `Puffin Cruises <${fromEmail}>`,
         to: [booking.customer_email],
         subject: `Booking Confirmed — ${booking.cruise_name}`,
         html: `<!doctype html>
@@ -525,7 +528,7 @@ async function handleCheckout(request: Request, env: Env): Promise<Response> {
   const origin = new URL(request.url).origin;
   const params: Record<string, string | number> = {
     mode: "payment",
-    "payment_method_types[0]": "card",
+    "automatic_payment_methods[enabled]": "true",
     success_url: `${origin}/booking/success?booking=${booking.id}`,
     cancel_url: `${origin}/booking/cancel?booking=${booking.id}`,
     customer_email: body.customerEmail,
