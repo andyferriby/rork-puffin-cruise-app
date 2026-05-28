@@ -17,7 +17,8 @@
       "supportsTablet": false,
       "bundleIdentifier": "app.rork.gpczuon7nhtm91bqwzkc7",
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "Crew can share the boat position during a sailing so customers can see live progress on the map."
+        "NSLocationWhenInUseUsageDescription": "Crew can share the boat position during a sailing so customers can see live progress on the map.",
+        "NSCameraUsageDescription": "Scan QR codes on boarding passes to check in passengers."
       }
     },
     "android": {
@@ -36,6 +37,12 @@
         "expo-router",
         {
           "origin": "https://rork.com/"
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Scan QR codes on boarding passes to check in passengers."
         }
       ],
       "expo-font",

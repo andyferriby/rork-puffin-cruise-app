@@ -1,21 +1,26 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { BarcodeScanningResult, CameraView, useCameraPermissions } from "expo-camera";
 import * as Haptics from "expo-haptics";
 import * as Location from "expo-location";
 import {
   AlertCircle,
   Bell,
   Calendar,
+  CheckCircle,
   Key,
   Lock,
   LogOut,
   MapPin,
   Minus,
   Plus,
+  QrCode,
   Radio,
   Save,
   ShipWheel,
+  Ticket,
   Trash2,
+  X,
 } from "lucide-react-native";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -38,6 +43,47 @@ import { fetchBoatLocation, saveBoatLocation, stopBoatTracking, type BoatLocatio
 import { supabase } from "@/lib/supabase";
 
 const ADMIN_PIN_KEY = "@puffin_admin_pin";
+
+type ScannedBooking = {
+  id: string;
+  customer_name: string;
+  cruise_name: string;
+  cruise_date: string;
+  cruise_time: string;
+  adults: number;
+  children: number;
+  status: string;
+};
+
+async function handleBarcodeScan(
+  data: string,
+  callbacks: {
+    setScannedBooking: (b: ScannedBooking | null) => void;
+    setScannerError: (e: string | null) => void;
+  },
+): Promise<void> {
+  const { setScannedBooking, setScannerError } = callbacks;
+  try {
+    const { data: bookings, error } = await supabase
+      .from("bookings")
+      .select("id, customer_name, cruise_name, cruise_date, cruise_time, adults, children, status")
+      .eq("id", data.trim())
+      .limit(1);
+
+    if (error) throw error;
+    if (!bookings || bookings.length === 0) {
+      setScannerError("No booking found for this QR code.");
+      return;
+    }
+    const booking = bookings[0] as ScannedBooking;
+    setScannedBooking(booking);
+    setScannerError(null);
+    if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  } catch (err) {
+    console.error("[admin] scan lookup", err);
+    setScannerError("Could not look up booking. Check your connection.");
+  }
+}
 
 const BASE = process.env.EXPO_PUBLIC_RORK_FUNCTIONS_URL ?? "";
 
@@ -174,6 +220,24 @@ function AdminEditor({
   const [notifying, setNotifying] = useState<boolean>(false);
   const [isTrackingBoat, setIsTrackingBoat] = useState<boolean>(false);
   const [trackingError, setTrackingError] = useState<string | null>(null);
+
+  // Scanner state
+  const [scannerOpen, setScannerOpen] = useState<boolean>(false);
+  const [scannedBooking, setScannedBooking] = useState<ScannedBooking | null>(null);
+  const [scannerError, setScannerError] = useState<string | null>(null);
+  const [markingBoarded, setMarkingBoarded] = useState<boolean>(false);
+  const [cameraPerm, requestCameraPerm] = useCameraPermissions();
+
+  const handleBarcodeScanned = useCallback(
+    (result: BarcodeScanningResult) => {
+      if (scannedBooking) return;
+      handleBarcodeScan(result.data, {
+        setScannedBooking,
+        setScannerError,
+      });
+    },
+    [scannedBooking],
+  );
 
   useEffect(() => {
     if (schedule && !edited) {
@@ -452,6 +516,142 @@ function AdminEditor({
         </Section>
 
         {/* Meta */}
+        {/* Ticket Scanner */}
+        <Section title="Ticket Scanner">
+          <View style={styles.scannerCard}>
+            {!scannerOpen ? (
+              <Pressable
+                onPress={async () => {
+                  if (!cameraPerm) return;
+                  if (!cameraPerm.granted) {
+                    const result = await requestCameraPerm();
+                    if (!result.granted) {
+                      setScannerError("Camera permission is needed to scan tickets.");
+                      return;
+                    }
+                  }
+                  setScannerError(null);
+                  setScannedBooking(null);
+                  setScannerOpen(true);
+                }}
+                style={[styles.scannerButton, !cameraPerm && { opacity: 0.5 }]}
+                disabled={!cameraPerm}
+              >
+                <QrCode size={20} color={theme.white} />
+                <Text style={styles.scannerButtonText}>Open Scanner</Text>
+              </Pressable>
+            ) : (
+              <View style={styles.scannerActive}>
+                <View style={styles.scannerHeader}>
+                  <Text style={styles.scannerTitle}>Scan QR Code</Text>
+                  <Pressable
+                    onPress={() => {
+                      setScannerOpen(false);
+                      setScannedBooking(null);
+                      setScannerError(null);
+                    }}
+                    hitSlop={8}
+                  >
+                    <X size={20} color={theme.text} />
+                  </Pressable>
+                </View>
+                <View style={styles.cameraWrapper}>
+                  <CameraView
+                    style={styles.camera}
+                    barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
+                    onBarcodeScanned={handleBarcodeScanned}
+                  />
+                  <View style={styles.scannerOverlay}>
+                    <View style={styles.scannerFrame} />
+                  </View>
+                </View>
+                <Text style={styles.scannerHint}>Point camera at the QR code on a boarding pass</Text>
+              </View>
+            )}
+
+            {scannerError && (
+              <View style={styles.scannerErrorRow}>
+                <AlertCircle size={14} color={theme.coral} />
+                <Text style={styles.scannerErrorText}>{scannerError}</Text>
+              </View>
+            )}
+
+            {scannedBooking && (
+              <View style={styles.scannedResult}>
+                <View style={styles.scannedStatusRow}>
+                  <CheckCircle size={18} color={theme.sea} />
+                  <Text style={styles.scannedStatusText}>Booking Found</Text>
+                </View>
+                <Text style={styles.scannedName}>{scannedBooking.customer_name}</Text>
+                <Text style={styles.scannedCruise}>{scannedBooking.cruise_name}</Text>
+                <Text style={styles.scannedMeta}>
+                  {new Date(scannedBooking.cruise_date).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })} · {scannedBooking.cruise_time}
+                </Text>
+                <Text style={styles.scannedMeta}>
+                  {scannedBooking.adults} adult{scannedBooking.adults === 1 ? "" : "s"} · {scannedBooking.children} child{scannedBooking.children === 1 ? "" : "ren"}
+                </Text>
+                <View style={styles.scannedStatusBadge}>
+                  <Text style={styles.scannedStatusBadgeText}>{scannedBooking.status.toUpperCase()}</Text>
+                </View>
+
+                {scannedBooking.status !== "boarded" && scannedBooking.status === "paid" && (
+                  <Pressable
+                    onPress={async () => {
+                      setMarkingBoarded(true);
+                      try {
+                        const { error } = await supabase
+                          .from("bookings")
+                          .update({ status: "boarded" })
+                          .eq("id", scannedBooking.id);
+                        if (error) throw error;
+                        setScannedBooking({ ...scannedBooking, status: "boarded" });
+                        if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                      } catch (err) {
+                        console.error("[admin] mark boarded", err);
+                        Alert.alert("Error", "Could not mark as boarded. Please try again.");
+                      } finally {
+                        setMarkingBoarded(false);
+                      }
+                    }}
+                    disabled={markingBoarded}
+                    style={[styles.boardedButton, markingBoarded && { opacity: 0.6 }]}
+                  >
+                    {markingBoarded ? (
+                      <ActivityIndicator color={theme.white} size="small" />
+                    ) : (
+                      <CheckCircle size={16} color={theme.white} />
+                    )}
+                    <Text style={styles.boardedButtonText}>
+                      {markingBoarded ? "Marking..." : "Mark as Boarded"}
+                    </Text>
+                  </Pressable>
+                )}
+
+                {scannedBooking.status === "boarded" && (
+                  <View style={styles.alreadyBoarded}>
+                    <CheckCircle size={16} color={theme.sea} />
+                    <Text style={styles.alreadyBoardedText}>Already boarded</Text>
+                  </View>
+                )}
+
+                {scannedBooking.status === "pending" && (
+                  <View style={styles.pendingWarning}>
+                    <AlertCircle size={14} color={theme.coral} />
+                    <Text style={styles.pendingWarningText}>Payment not yet confirmed. Cannot board until paid.</Text>
+                  </View>
+                )}
+
+                <Pressable
+                  onPress={() => setScannedBooking(null)}
+                  style={styles.scanAnother}
+                >
+                  <Text style={styles.scanAnotherText}>Scan Another</Text>
+                </Pressable>
+              </View>
+            )}
+          </View>
+        </Section>
+
         <Section title="Notice">
           <TextInput
             value={edited.notice ?? ""}
@@ -907,4 +1107,165 @@ const styles = StyleSheet.create({
     backgroundColor: theme.sea,
   },
   saveBtnText: { color: theme.white, fontWeight: "800", fontSize: 15 },
+
+  // Scanner
+  scannerCard: {
+    backgroundColor: theme.white,
+    borderWidth: 1,
+    borderColor: theme.border,
+    borderRadius: 18,
+    padding: 14,
+    gap: 12,
+  },
+  scannerButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    backgroundColor: theme.sea,
+    paddingVertical: 14,
+    borderRadius: 14,
+  },
+  scannerButtonText: { color: theme.white, fontWeight: "800", fontSize: 15 },
+  scannerActive: { gap: 10 },
+  scannerHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  scannerTitle: { fontSize: 16, fontWeight: "800", color: theme.text },
+  cameraWrapper: {
+    height: 220,
+    borderRadius: 16,
+    overflow: "hidden",
+    backgroundColor: "#000",
+  },
+  camera: { flex: 1 },
+  scannerOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  scannerFrame: {
+    width: 160,
+    height: 160,
+    borderWidth: 2,
+    borderColor: "rgba(255,255,255,0.7)",
+    borderRadius: 16,
+    backgroundColor: "transparent",
+  },
+  scannerHint: {
+    textAlign: "center",
+    color: theme.textMuted,
+    fontSize: 13,
+  },
+  scannerErrorRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: theme.foam,
+    padding: 10,
+    borderRadius: 10,
+  },
+  scannerErrorText: { color: theme.coral, fontSize: 13, fontWeight: "600" },
+  scannedResult: {
+    backgroundColor: theme.foam,
+    borderRadius: 14,
+    padding: 14,
+    gap: 6,
+  },
+  scannedStatusRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  scannedStatusText: {
+    color: theme.sea,
+    fontWeight: "800",
+    fontSize: 14,
+  },
+  scannedName: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: theme.text,
+    marginTop: 4,
+  },
+  scannedCruise: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: theme.text,
+  },
+  scannedMeta: {
+    fontSize: 13,
+    color: theme.textMuted,
+  },
+  scannedStatusBadge: {
+    alignSelf: "flex-start",
+    backgroundColor: theme.white,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    marginTop: 4,
+  },
+  scannedStatusBadgeText: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: theme.coral,
+  },
+  boardedButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: theme.sea,
+    paddingVertical: 12,
+    borderRadius: 12,
+    marginTop: 8,
+  },
+  boardedButtonText: {
+    color: theme.white,
+    fontWeight: "800",
+    fontSize: 14,
+  },
+  alreadyBoarded: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: theme.white,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    marginTop: 8,
+  },
+  alreadyBoardedText: {
+    color: theme.sea,
+    fontWeight: "700",
+    fontSize: 14,
+  },
+  pendingWarning: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "#FFF3F0",
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    marginTop: 4,
+  },
+  pendingWarningText: {
+    color: theme.coral,
+    fontSize: 13,
+    fontWeight: "600",
+    flex: 1,
+  },
+  scanAnother: {
+    alignItems: "center",
+    paddingVertical: 8,
+    marginTop: 4,
+  },
+  scanAnotherText: {
+    color: theme.sea,
+    fontWeight: "700",
+    fontSize: 13,
+  },
 });

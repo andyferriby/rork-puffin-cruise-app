@@ -18,6 +18,7 @@ type Env = {
   APPLE_SIGNER_CERT_PEM?: string;
   APPLE_SIGNER_KEY_PKCS8_PEM?: string;
   APPLE_WWDR_PEM?: string;
+  RESEND_API_KEY?: string;
 };
 
 const APPLE_PASS_TYPE_ID = "pass.com.puffincruises.boarding";
@@ -340,6 +341,69 @@ function crc32(data: Uint8Array): number {
   return (crc ^ 0xffffffff) >>> 0;
 }
 
+// ── Email Sending ──────────────────────────────────────────────
+
+async function sendBookingConfirmationEmail(
+  env: Env,
+  booking: { customer_email: string; customer_name: string; cruise_name: string; cruise_date: string; cruise_time: string; id: string; adults: number; children: number },
+): Promise<void> {
+  if (!env.RESEND_API_KEY) {
+    console.warn("[email] RESEND_API_KEY not set — skipping confirmation email");
+    return;
+  }
+
+  const formattedDate = new Date(booking.cruise_date).toLocaleDateString("en-GB", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+
+  const passengerSummary = [
+    booking.adults > 0 ? `${booking.adults} adult${booking.adults === 1 ? "" : "s"}` : null,
+    booking.children > 0 ? `${booking.children} child${booking.children === 1 ? "" : "ren"}` : null,
+  ].filter(Boolean).join(", ");
+
+  try {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${env.RESEND_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: "Puffin Cruises <bookings@puffincruises.com>",
+        to: [booking.customer_email],
+        subject: `Booking Confirmed — ${booking.cruise_name}`,
+        html: `<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:40px 16px;font-family:-apple-system,BlinkMacSystemFont,'SF Pro',system-ui,sans-serif;background:#0B2A4A;color:#fff;text-align:center">
+<div style="max-width:440px;margin:0 auto;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:24px;padding:36px 24px">
+<p style="font-size:48px;margin:0 0 12px">🐧</p>
+<h1 style="font-size:26px;margin:0 0 8px">You're booked!</h1>
+<p style="margin:0 0 6px;opacity:.85;font-size:15px">Reference: <strong>${booking.id.slice(0, 8).toUpperCase()}</strong></p>
+<hr style="border:none;border-top:1px solid rgba(255,255,255,0.2);margin:20px 0">
+<p style="margin:0 0 4px;font-size:18px;font-weight:700">${booking.cruise_name}</p>
+<p style="margin:0 0 4px;opacity:.85">${formattedDate} at ${booking.cruise_time}</p>
+<p style="margin:0 0 2px;opacity:.85">${passengerSummary}</p>
+<hr style="border:none;border-top:1px solid rgba(255,255,255,0.2);margin:20px 0">
+<p style="margin:0 0 4px;opacity:.85"><strong>${booking.customer_name}</strong></p>
+<p style="margin:0;opacity:.75;font-size:13px">Open the Puffin Cruises app to view your QR boarding pass or add it to Apple Wallet.</p>
+<p style="margin:20px 0 0;opacity:.65;font-size:13px">Amble Harbour, Northumberland</p>
+</div></body></html>`,
+      }),
+    });
+    if (!res.ok) {
+      const body = await res.text();
+      console.error("[email] resend failed", res.status, body);
+    } else {
+      console.log("[email] confirmation sent to", booking.customer_email);
+    }
+  } catch (err) {
+    console.error("[email] send error", err);
+  }
+}
+
 // ── Push notifications ──────────────────────────────────────────
 
 const EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send";
@@ -505,6 +569,15 @@ async function handleWebhook(request: Request, env: Env): Promise<Response> {
         }),
       });
       console.log("booking marked paid", bookingId);
+
+      // Send confirmation email
+      const bookingRes = await supa(env, `/bookings?id=eq.${encodeURIComponent(bookingId)}&select=id,customer_email,customer_name,cruise_name,cruise_date,cruise_time,adults,children`, { method: "GET" });
+      if (bookingRes.ok) {
+        const bookings = (await bookingRes.json()) as { id: string; customer_email: string; customer_name: string; cruise_name: string; cruise_date: string; cruise_time: string; adults: number; children: number }[];
+        if (bookings[0]) {
+          await sendBookingConfirmationEmail(env, bookings[0]);
+        }
+      }
     }
   }
   return new Response(null, { status: 200 });
