@@ -12,7 +12,7 @@
 - [x] **Interactive Map** — Amble Harbour, Coquet Island route, parking, dining, landmarks, category filters, and live boat position
 - [x] **Wildlife Guide** — Puffins, seals, terns, and more with descriptions, season info, and fun facts
 - [x] **Admin Panel** — PIN-gated schedule/price editor, push notifications, QR ticket scanner
-- [x] **First-Time Onboarding** — Swipe-through welcome cards introducing the app on first launch
+- [x] **First-Time Onboarding** — Swipe-through welcome cards introducing the app, wildlife, tickets, and live boat tracking on first launch
 - [x] **Loyalty Program (Puffin Club)** — Tiered rewards (Bronze → Silver → Gold → Platinum) based on trips taken, with progress bar and tier benefits
 - [x] **Refer a Friend** — Unique referral codes, share sheet, £5 credit for both referrer and referred
 - [x] **Arrival Guide** — Comprehensive pre-cruise info: parking, what to bring, check-in, accessibility, weather policies, contact details
@@ -32,5 +32,5 @@ Nautical theme throughout — deep navy blues, sea blue, coral and puffin orange
 - [x] Tickets — QR boarding passes, Apple Wallet, email lookup, ratings & reviews, crew updates
 - [x] Profile — loyalty tier card, benefits, refer a friend, arrival guide link, past bookings
 - [x] Admin — PIN-locked schedule/price editor, push notifications, QR scanner, crew boat tracker
-- [x] Onboarding — first-launch swipe-through with 5 welcome slides
+- [x] Onboarding — first-launch swipe-through with 6 welcome slides including live boat tracking
 - [x] Arrival Guide — parking, what to bring, check-in, accessibility, weather, contact

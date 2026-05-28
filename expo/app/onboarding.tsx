@@ -16,6 +16,7 @@ const slides: Slide[] = [
   { emoji: "⛴️", title: "Welcome to\nPuffin Cruises", subtitle: "Book family-run wildlife adventures from Amble Harbour to Coquet Island.", colors: [theme.deep, theme.sea] },
   { emoji: "📅", title: "Book Your\nAdventure", subtitle: "Choose your cruise, sailing time, passengers and pay securely by card.", colors: [theme.sea, theme.wave] },
   { emoji: "🦭", title: "Meet the\nWildlife", subtitle: "Use the wildlife guide to spot puffins, seals, Arctic terns and island birds.", colors: [theme.coral, theme.puffin] },
+  { emoji: "📍", title: "Track the\nBoat Live", subtitle: "Follow the cruise on the interactive map when crew share live position updates from the water.", colors: [theme.wave, theme.deep] },
   { emoji: "🎟️", title: "Tickets &\nRewards", subtitle: "Keep boarding passes in the app and earn Puffin Club perks as you sail.", colors: [theme.puffin, theme.sandDeep] },
   { emoji: "⚓", title: "Ready to\nSet Sail?", subtitle: "Check the arrival guide before you come and refer friends for rewards.", colors: [theme.ink, theme.deep] },
 ];
