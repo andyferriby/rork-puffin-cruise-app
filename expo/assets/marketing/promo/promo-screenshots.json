@@ -1,0 +1,40 @@
+{
+  "style": "Clean App Store cards inspired by the supplied references: cream/coastal backgrounds, bold dark headlines, phone mockups, soft shadows, and puffin orange/sea-blue accents.",
+  "items": [
+    {
+      "file": "promo/01-book-your-island-cruise.png",
+      "headline": "Book Your Island Cruise",
+      "subtitle": "Browse sailings, reviews and book your Coquet Island trip in seconds."
+    },
+    {
+      "file": "promo/02-follow-the-boat-live.png",
+      "headline": "Follow The Boat Live",
+      "subtitle": "See the cruise route, harbour points and crew-shared boat position on the map."
+    },
+    {
+      "file": "promo/03-spot-puffins-seals.png",
+      "headline": "Spot Puffins And Seals",
+      "subtitle": "Explore seasonal wildlife before you sail around Coquet Island."
+    },
+    {
+      "file": "promo/04-reserve-seats-fast.png",
+      "headline": "Reserve Seats Fast",
+      "subtitle": "Pick your date, time and passengers with a clear booking flow."
+    },
+    {
+      "file": "promo/05-tickets-ready-onboard.png",
+      "headline": "Tickets Ready Onboard",
+      "subtitle": "Keep QR boarding passes, cruise details and updates in one place."
+    },
+    {
+      "file": "promo/06-know-before-you-go.png",
+      "headline": "Know Before You Go",
+      "subtitle": "Find parking, check-in details, dining nearby and what to bring."
+    },
+    {
+      "file": "promo/facebook-live-tracker.png",
+      "headline": "Follow The Boat Live",
+      "subtitle": "Facebook square promo creative"
+    }
+  ]
+}
