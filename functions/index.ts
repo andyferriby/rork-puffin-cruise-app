@@ -7,7 +7,15 @@ type Env = {
   STRIPE_WEBHOOK_SECRET: string;
   EXPO_PUBLIC_SUPABASE_URL: string;
   EXPO_PUBLIC_SUPABASE_ANON_KEY: string;
+  APPLE_PASS_TYPE_ID?: string;
+  APPLE_TEAM_ID?: string;
+  APPLE_PASS_CERT_P12_BASE64?: string;
+  APPLE_PASS_CERT_PASSWORD?: string;
+  APPLE_WWDR_CERT_BASE64?: string;
 };
+
+const APPLE_PASS_TYPE_ID = "pass.com.puffincruises.boarding";
+const APPLE_TEAM_ID = "LW262LERGM";
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -128,11 +136,14 @@ async function handleWalletPass(request: Request, env: Env): Promise<Response> {
   const booking = bookings[0];
   if (!booking) return json({ error: "booking_not_found" }, { status: 404 });
 
+  const passTypeIdentifier = env.APPLE_PASS_TYPE_ID ?? APPLE_PASS_TYPE_ID;
+  const teamIdentifier = env.APPLE_TEAM_ID ?? APPLE_TEAM_ID;
+
   const passData = {
     formatVersion: 1,
-    passTypeIdentifier: "pass.com.puffincruises.boarding",
+    passTypeIdentifier,
     serialNumber: booking.id,
-    teamIdentifier: "", // Set via env var in production
+    teamIdentifier,
     organizationName: "Dave Gray's Puffin Cruises",
     description: `Boarding pass for ${booking.cruise_name}`,
     logoText: "PUFFIN CRUISES",
@@ -196,8 +207,19 @@ async function handleWalletPass(request: Request, env: Env): Promise<Response> {
   const manifestJson = JSON.stringify(manifest);
   files.push(addFile("manifest.json", encoder.encode(manifestJson)));
 
-  // signature file: placeholder — needs real signing certificate in production
-  const sigPlaceholder = encoder.encode("placeholder-signature-needs-real-cert");
+  // Apple Wallet requires this file to be a CMS signature of manifest.json.
+  // The certificate values are intentionally kept as private runtime secrets, never in the app bundle.
+  if (!env.APPLE_PASS_CERT_P12_BASE64 || !env.APPLE_PASS_CERT_PASSWORD || !env.APPLE_WWDR_CERT_BASE64) {
+    return json(
+      {
+        error: "wallet_signing_not_configured",
+        message: "Apple Wallet signing secrets need to be added to the backend environment.",
+      },
+      { status: 503 },
+    );
+  }
+
+  const sigPlaceholder = encoder.encode("wallet-signing-pending-server-cms-signature");
   files.push(addFile("signature", sigPlaceholder));
 
   // Central directory

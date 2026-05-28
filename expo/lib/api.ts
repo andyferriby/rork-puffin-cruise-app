@@ -1,5 +1,9 @@
 const BASE = process.env.EXPO_PUBLIC_RORK_FUNCTIONS_URL ?? "";
 
+export function walletPassUrl(bookingId: string): string {
+  return `${BASE}/wallet/pass?bookingId=${encodeURIComponent(bookingId)}`;
+}
+
 export type CreateCheckoutBody = {
   cruiseId: string;
   cruiseName: string;
