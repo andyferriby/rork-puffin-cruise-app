@@ -22,7 +22,7 @@ import {
   Trash2,
   X,
 } from "lucide-react-native";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -227,16 +227,21 @@ function AdminEditor({
   const [scannerError, setScannerError] = useState<string | null>(null);
   const [markingBoarded, setMarkingBoarded] = useState<boolean>(false);
   const [cameraPerm, requestCameraPerm] = useCameraPermissions();
+  const scanLockRef = useRef<boolean>(false);
 
   const handleBarcodeScanned = useCallback(
     (result: BarcodeScanningResult) => {
-      if (scannedBooking) return;
+      // Guard with a ref so rapid camera frames don't fire dozens of
+      // overlapping lookups (which caused repeated haptics / no settled result).
+      if (scanLockRef.current) return;
+      scanLockRef.current = true;
+      if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       handleBarcodeScan(result.data, {
         setScannedBooking,
         setScannerError,
       });
     },
-    [scannedBooking],
+    [],
   );
 
   useEffect(() => {
@@ -532,6 +537,7 @@ function AdminEditor({
                   }
                   setScannerError(null);
                   setScannedBooking(null);
+                  scanLockRef.current = false;
                   setScannerOpen(true);
                 }}
                 style={[styles.scannerButton, !cameraPerm && { opacity: 0.5 }]}
@@ -548,6 +554,7 @@ function AdminEditor({
                     onPress={() => {
                       setScannerOpen(false);
                       setScannedBooking(null);
+                      scanLockRef.current = false;
                       setScannerError(null);
                     }}
                     hitSlop={8}
@@ -642,7 +649,11 @@ function AdminEditor({
                 )}
 
                 <Pressable
-                  onPress={() => setScannedBooking(null)}
+                  onPress={() => {
+                    setScannedBooking(null);
+                    setScannerError(null);
+                    scanLockRef.current = false;
+                  }}
                   style={styles.scanAnother}
                 >
                   <Text style={styles.scanAnotherText}>Scan Another</Text>
