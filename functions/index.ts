@@ -528,7 +528,6 @@ async function handleCheckout(request: Request, env: Env): Promise<Response> {
   const origin = new URL(request.url).origin;
   const params: Record<string, string | number> = {
     mode: "payment",
-    "automatic_payment_methods[enabled]": "true",
     success_url: `${origin}/booking/success?booking=${booking.id}`,
     cancel_url: `${origin}/booking/cancel?booking=${booking.id}`,
     customer_email: body.customerEmail,
