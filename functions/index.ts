@@ -199,39 +199,18 @@ async function handleWalletPass(request: Request, env: Env): Promise<Response> {
   };
 
   const passJson = JSON.stringify(passData);
-  const manifest: Record<string, string> = {
-    "pass.json": await sha1(passJson),
-  };
-
-  // Build the .pkpass zip in memory
-  const chunks: Uint8Array[] = [];
   const encoder = new TextEncoder();
+  const baseFiles: ZipSourceFile[] = [
+    { name: "pass.json", content: encoder.encode(passJson) },
+    { name: "icon.png", content: base64ToBytes(PASS_ICON_PNG_BASE64) },
+    { name: "icon@2x.png", content: base64ToBytes(PASS_ICON_PNG_BASE64) },
+  ];
 
-  function addFile(name: string, content: Uint8Array) {
-    const nameBytes = encoder.encode(name);
-    const header = new Uint8Array(30 + nameBytes.length);
-    const localHeaderOffset = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
-    const dv = new DataView(header.buffer);
-    dv.setUint32(0, 0x04034b50, true); // local file header signature
-    dv.setUint16(4, 20, true); // version needed to extract
-    dv.setUint16(8, 0, true); // compression: none
-    dv.setUint32(14, crc32(content), true);
-    dv.setUint32(18, content.length, true);
-    dv.setUint32(22, content.length, true);
-    dv.setUint16(26, nameBytes.length, true);
-    dv.setUint16(28, 0, true); // extra field length
-    chunks.push(header);
-    chunks.push(nameBytes);
-    chunks.push(content);
-
-    return { name, header, content, localHeaderOffset };
-  }
-
-  const files: { name: string; header: Uint8Array; content: Uint8Array; localHeaderOffset: number }[] = [];
-  files.push(addFile("pass.json", encoder.encode(passJson)));
-
+  const manifestEntries = await Promise.all(
+    baseFiles.map(async (file) => [file.name, await sha1Bytes(file.content)] as const),
+  );
+  const manifest = Object.fromEntries(manifestEntries) as Record<string, string>;
   const manifestJson = JSON.stringify(manifest);
-  files.push(addFile("manifest.json", encoder.encode(manifestJson)));
 
   // Apple Wallet requires this file to be a detached PKCS#7/CMS signature of manifest.json.
   // Signing material is read only from private backend secrets, never from the mobile bundle.
@@ -252,53 +231,12 @@ async function handleWalletPass(request: Request, env: Env): Promise<Response> {
     privateKeyPkcs8Pem: signingMaterial.privateKeyPkcs8Pem,
     wwdrPem: signingMaterial.wwdrPem,
   });
-  files.push(addFile("signature", signature));
 
-  // Central directory
-  let cdOffset = 0;
-  for (const f of files) {
-    cdOffset += 30 + encoder.encode(f.name).length + f.content.length;
-  }
-
-  for (const f of files) {
-    const nameBytes = encoder.encode(f.name);
-    const cd = new Uint8Array(46 + nameBytes.length);
-    const dv = new DataView(cd.buffer);
-    dv.setUint32(0, 0x02014b50, true);
-    dv.setUint16(8, 0, true);
-    dv.setUint16(10, 0, true);
-    dv.setUint32(12, crc32(f.content), true);
-    dv.setUint32(16, f.content.length, true);
-    dv.setUint32(20, f.content.length, true);
-    dv.setUint16(24, nameBytes.length, true);
-    dv.setUint16(28, 0, true);
-    dv.setUint16(30, 0, true);
-    dv.setUint16(32, 0, true);
-    dv.setUint32(34, 0, true);
-    dv.setUint32(38, 0, true);
-    dv.setUint32(42, f.localHeaderOffset, true);
-    chunks.push(cd);
-    chunks.push(nameBytes);
-  }
-
-  // End of central directory
-  const totalCdSize = files.reduce((sum, f) => sum + 46 + encoder.encode(f.name).length, 0);
-  const eocd = new Uint8Array(22);
-  const dv2 = new DataView(eocd.buffer);
-  dv2.setUint32(0, 0x06054b50, true);
-  dv2.setUint16(8, files.length, true);
-  dv2.setUint16(10, files.length, true);
-  dv2.setUint32(12, totalCdSize, true);
-  dv2.setUint32(16, cdOffset, true);
-  chunks.push(eocd);
-
-  const totalLength = chunks.reduce((s, c) => s + c.length, 0);
-  const result = new Uint8Array(totalLength);
-  let offset = 0;
-  for (const c of chunks) {
-    result.set(c, offset);
-    offset += c.length;
-  }
+  const result = createStoredZip([
+    ...baseFiles,
+    { name: "manifest.json", content: encoder.encode(manifestJson) },
+    { name: "signature", content: signature },
+  ]);
 
   return new Response(result, {
     headers: {
@@ -340,13 +278,99 @@ function certBase64ToPem(value?: string): string | null {
   return body ? `-----BEGIN CERTIFICATE-----\n${body}\n-----END CERTIFICATE-----` : null;
 }
 
-async function sha1(input: string): Promise<string> {
-  const data = new TextEncoder().encode(input);
-  const hash = await crypto.subtle.digest("SHA-1", data);
+async function sha1Bytes(input: Uint8Array): Promise<string> {
+  const hash = await crypto.subtle.digest("SHA-1", input);
   return Array.from(new Uint8Array(hash))
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
 }
+
+type ZipSourceFile = { name: string; content: Uint8Array };
+type ZipFileEntry = ZipSourceFile & { localHeaderOffset: number; crc: number };
+
+function createStoredZip(sourceFiles: ZipSourceFile[]): Uint8Array {
+  const chunks: Uint8Array[] = [];
+  const encoder = new TextEncoder();
+  const files: ZipFileEntry[] = [];
+
+  for (const sourceFile of sourceFiles) {
+    const nameBytes = encoder.encode(sourceFile.name);
+    const localHeaderOffset = byteLength(chunks);
+    const crc = crc32(sourceFile.content);
+    const header = new Uint8Array(30);
+    const dv = new DataView(header.buffer);
+    dv.setUint32(0, 0x04034b50, true);
+    dv.setUint16(4, 20, true);
+    dv.setUint16(6, 0, true);
+    dv.setUint16(8, 0, true);
+    dv.setUint16(10, 0, true);
+    dv.setUint16(12, 0, true);
+    dv.setUint32(14, crc, true);
+    dv.setUint32(18, sourceFile.content.length, true);
+    dv.setUint32(22, sourceFile.content.length, true);
+    dv.setUint16(26, nameBytes.length, true);
+    dv.setUint16(28, 0, true);
+    chunks.push(header, nameBytes, sourceFile.content);
+    files.push({ ...sourceFile, localHeaderOffset, crc });
+  }
+
+  const centralDirectoryOffset = byteLength(chunks);
+  for (const file of files) {
+    const nameBytes = encoder.encode(file.name);
+    const centralDirectory = new Uint8Array(46);
+    const dv = new DataView(centralDirectory.buffer);
+    dv.setUint32(0, 0x02014b50, true);
+    dv.setUint16(4, 20, true);
+    dv.setUint16(6, 20, true);
+    dv.setUint16(8, 0, true);
+    dv.setUint16(10, 0, true);
+    dv.setUint16(12, 0, true);
+    dv.setUint16(14, 0, true);
+    dv.setUint32(16, file.crc, true);
+    dv.setUint32(20, file.content.length, true);
+    dv.setUint32(24, file.content.length, true);
+    dv.setUint16(28, nameBytes.length, true);
+    dv.setUint16(30, 0, true);
+    dv.setUint16(32, 0, true);
+    dv.setUint16(34, 0, true);
+    dv.setUint16(36, 0, true);
+    dv.setUint32(38, 0, true);
+    dv.setUint32(42, file.localHeaderOffset, true);
+    chunks.push(centralDirectory, nameBytes);
+  }
+
+  const centralDirectorySize = byteLength(chunks) - centralDirectoryOffset;
+  const eocd = new Uint8Array(22);
+  const dv = new DataView(eocd.buffer);
+  dv.setUint32(0, 0x06054b50, true);
+  dv.setUint16(4, 0, true);
+  dv.setUint16(6, 0, true);
+  dv.setUint16(8, files.length, true);
+  dv.setUint16(10, files.length, true);
+  dv.setUint32(12, centralDirectorySize, true);
+  dv.setUint32(16, centralDirectoryOffset, true);
+  dv.setUint16(20, 0, true);
+  chunks.push(eocd);
+
+  const result = new Uint8Array(byteLength(chunks));
+  let offset = 0;
+  for (const chunk of chunks) {
+    result.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return result;
+}
+
+function byteLength(chunks: Uint8Array[]): number {
+  return chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+}
+
+function base64ToBytes(value: string): Uint8Array {
+  return Uint8Array.from(Buffer.from(value, "base64"));
+}
+
+// 1x1 PNG used as the required Wallet pass icon assets. The visible pass design is driven by pass.json.
+const PASS_ICON_PNG_BASE64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGkBgWCFwAAAABJRU5ErkJggg==";
 
 // CRC32 implementation for ZIP format
 function crc32(data: Uint8Array): number {
