@@ -453,15 +453,30 @@ async function sendBookingConfirmationEmail(
 
 const EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send";
 
+type StoredPushToken = { token: string; platform: string; email?: string; createdAt: string };
+type ReminderLogEntry = { bookingId: string; type: string; sentAt: string };
+type ReminderType = "day_before" | "morning_of" | "hour_before" | "20min_before";
+
+async function getPushTokens(env: Env): Promise<{ tokens: StoredPushToken[]; raw: Record<string, unknown> }> {
+  const configRes = await supa(env, `/app_config?key=eq.push_tokens&select=value`, { method: "GET" });
+  if (!configRes.ok) return { tokens: [], raw: {} };
+  const rows = (await configRes.json()) as { value: unknown }[];
+  const raw = (rows[0]?.value ?? {}) as Record<string, unknown>;
+  const tokens: StoredPushToken[] = Array.isArray(raw?.tokens) ? (raw.tokens as StoredPushToken[]) : [];
+  return { tokens, raw };
+}
+
+async function putPushTokens(env: Env, value: Record<string, unknown>): Promise<void> {
+  await supa(env, `/app_config`, {
+    method: "POST",
+    body: JSON.stringify({ key: "push_tokens", value }),
+  });
+}
+
 async function handleNotify(request: Request, env: Env): Promise<Response> {
   const body = (await request.json()) as { title: string; body: string };
 
-  // Fetch push tokens from app_config
-  const configRes = await supa(env, `/app_config?key=eq.push_tokens&select=value`, { method: "GET" });
-  if (!configRes.ok) return json({ error: "config_unavailable" }, { status: 500 });
-  const rows = (await configRes.json()) as { value: unknown }[];
-  const pushData = rows[0]?.value as { tokens?: { token: string; platform: string; createdAt: string }[] } | undefined;
-  const tokens = pushData?.tokens ?? [];
+  const { tokens, raw } = await getPushTokens(env);
 
   if (tokens.length === 0) {
     return json({ sent: 0, message: "No registered devices" });
@@ -477,7 +492,6 @@ async function handleNotify(request: Request, env: Env): Promise<Response> {
     sound: "default" as const,
   }));
 
-  // Expo push API accepts chunks; send individually for reliability
   for (const msg of messages) {
     try {
       const res = await fetch(EXPO_PUSH_URL, {
@@ -492,7 +506,6 @@ async function handleNotify(request: Request, env: Env): Promise<Response> {
     }
   }
 
-  // Store notification in the notifications table
   await supa(env, `/notifications`, {
     method: "POST",
     body: JSON.stringify({
@@ -503,16 +516,239 @@ async function handleNotify(request: Request, env: Env): Promise<Response> {
     }),
   });
 
-  // Update last-notified timestamp
-  await supa(env, `/app_config`, {
-    method: "POST",
-    body: JSON.stringify({
-      key: "push_tokens",
-      value: { ...pushData, lastNotifiedAt: new Date().toISOString() },
-    }),
+  await putPushTokens(env, { ...raw, lastNotifiedAt: new Date().toISOString() });
+  return json({ sent, failed });
+}
+
+// ── Device linking ──────────────────────────────────────────────
+
+async function handleLinkDevice(request: Request, env: Env): Promise<Response> {
+  const body = (await request.json()) as { token: string; email: string; platform: string };
+  if (!body.token || !body.email) {
+    return json({ error: "missing token or email" }, { status: 400 });
+  }
+
+  const normalizedEmail = body.email.trim().toLowerCase();
+  const { tokens, raw } = await getPushTokens(env);
+
+  // Update existing token or add new one
+  const filtered = tokens.filter((t) => t.token !== body.token);
+  filtered.push({
+    token: body.token,
+    platform: body.platform ?? "unknown",
+    email: normalizedEmail,
+    createdAt: new Date().toISOString(),
   });
 
-  return json({ sent, failed });
+  const trimmed = filtered.slice(-500);
+  await putPushTokens(env, { ...raw, tokens: trimmed });
+
+  console.log("[link-device] linked token to", normalizedEmail);
+  return json({ ok: true, email: normalizedEmail });
+}
+
+// ── Trip reminder cron ──────────────────────────────────────────
+
+const REMINDER_CONFIG: { type: ReminderType; label: string; offsetMs: number; title: string }[] = [
+  {
+    type: "day_before",
+    label: "Day before",
+    offsetMs: -24 * 60 * 60 * 1000, // 24h before — but we adjust to 10am
+    title: "Your Puffin Cruise is tomorrow! 🐧",
+  },
+  {
+    type: "morning_of",
+    label: "Morning of",
+    offsetMs: -6 * 60 * 60 * 1000, // approx 8am-ish, but we calculate properly
+    title: "Today's the day! 🌊",
+  },
+  {
+    type: "hour_before",
+    label: "1 hour before",
+    offsetMs: -60 * 60 * 1000,
+    title: "⏰ Your cruise is in 1 hour!",
+  },
+  {
+    type: "20min_before",
+    label: "20 minutes before",
+    offsetMs: -20 * 60 * 1000,
+    title: "🚢 Boarding now — 20 minutes!",
+  },
+];
+
+function parseCruiseDateTime(dateStr: string, timeStr: string): Date | null {
+  // dateStr: "2026-05-29", timeStr: "14:30"
+  const d = new Date(`${dateStr}T${timeStr}:00Z`);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+/**
+ * Calculate the ideal send time for a reminder type given the cruise datetime.
+ * "day_before" fires at 10:00 the day before.
+ * "morning_of" fires at 08:00 on the day of the cruise.
+ * "hour_before" fires exactly 1 hour before departure.
+ * "20min_before" fires exactly 20 minutes before departure.
+ */
+function reminderTargetTime(cruiseTime: Date, type: ReminderType): Date {
+  const target = new Date(cruiseTime);
+  switch (type) {
+    case "day_before": {
+      target.setDate(target.getDate() - 1);
+      target.setHours(10, 0, 0, 0);
+      break;
+    }
+    case "morning_of": {
+      target.setHours(8, 0, 0, 0);
+      break;
+    }
+    case "hour_before": {
+      target.setHours(target.getHours() - 1);
+      break;
+    }
+    case "20min_before": {
+      target.setMinutes(target.getMinutes() - 20);
+      break;
+    }
+  }
+  return target;
+}
+
+function reminderBody(type: ReminderType, cruiseName: string, cruiseTime: string, cruiseDate: string): string {
+  const formattedDate = new Date(cruiseDate).toLocaleDateString("en-GB", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
+
+  switch (type) {
+    case "day_before":
+      return `${cruiseName} departs tomorrow at ${cruiseTime}. Check the app for your boarding pass and arrival guide. See you at Amble Harbour! 🐧`;
+    case "morning_of":
+      return `${cruiseName} departs today at ${cruiseTime} from Amble Harbour. Your QR boarding pass is ready in the app. Fair winds! ⛵️`;
+    case "hour_before":
+      return `1 hour to go! Head to Amble Harbour now for ${cruiseName}. Show your QR pass from the Tickets tab for boarding.`;
+    case "20min_before":
+      return `Boarding is open! ${cruiseName} departs in 20 minutes. Have your QR pass ready at Amble Harbour. Enjoy the puffins! 🐧`;
+  }
+}
+
+async function getReminderLogs(env: Env): Promise<ReminderLogEntry[]> {
+  const configRes = await supa(env, `/app_config?key=eq.reminder_logs&select=value`, { method: "GET" });
+  if (!configRes.ok) return [];
+  const rows = (await configRes.json()) as { value: unknown }[];
+  const val = rows[0]?.value;
+  return Array.isArray(val) ? (val as ReminderLogEntry[]) : [];
+}
+
+async function logReminder(env: Env, bookingId: string, type: ReminderType): Promise<void> {
+  const existing = await getReminderLogs(env);
+  existing.push({ bookingId, type, sentAt: new Date().toISOString() });
+  // Keep last 2000 entries
+  const trimmed = existing.slice(-2000);
+  await supa(env, `/app_config`, {
+    method: "POST",
+    body: JSON.stringify({ key: "reminder_logs", value: trimmed }),
+  });
+}
+
+async function handleTripReminders(request: Request, env: Env): Promise<Response> {
+  const now = new Date();
+  const thirtyMinutesFromNow = new Date(now.getTime() + 30 * 60 * 1000);
+
+  // Fetch paid bookings within the next 2 days
+  const fromDate = new Date();
+  fromDate.setDate(fromDate.getDate() - 1); // include yesterday for day-before-reminders that may have been missed
+  const toDate = new Date();
+  toDate.setDate(toDate.getDate() + 3);
+
+  const fromStr = fromDate.toISOString().slice(0, 10);
+  const toStr = toDate.toISOString().slice(0, 10);
+
+  const bookingsRes = await supa(
+    env,
+    `/bookings?status=eq.paid&cruise_date=gte.${fromStr}&cruise_date=lte.${toStr}&select=id,customer_email,customer_name,cruise_name,cruise_date,cruise_time&order=cruise_date.asc`,
+    { method: "GET" },
+  );
+
+  if (!bookingsRes.ok) {
+    console.error("[reminders] failed to fetch bookings", bookingsRes.status);
+    return json({ error: "failed to fetch bookings" }, { status: 500 });
+  }
+
+  const bookings = (await bookingsRes.json()) as {
+    id: string;
+    customer_email: string;
+    customer_name: string;
+    cruise_name: string;
+    cruise_date: string;
+    cruise_time: string;
+  }[];
+
+  const { tokens } = await getPushTokens(env);
+  const reminderLogs = await getReminderLogs(env);
+  const sentSet = new Set(reminderLogs.map((l) => `${l.bookingId}|${l.type}`));
+
+  let sent = 0;
+  let skipped = 0;
+  const results: string[] = [];
+
+  for (const booking of bookings) {
+    const cruiseDateTime = parseCruiseDateTime(booking.cruise_date, booking.cruise_time);
+    if (!cruiseDateTime) continue;
+    if (cruiseDateTime < now) continue; // already sailed
+
+    const normalizedEmail = booking.customer_email.trim().toLowerCase();
+    const deviceTokens = tokens
+      .filter((t) => t.email?.toLowerCase() === normalizedEmail)
+      .map((t) => t.token);
+
+    if (deviceTokens.length === 0) {
+      skipped++;
+      continue;
+    }
+
+    for (const cfg of REMINDER_CONFIG) {
+      const targetTime = reminderTargetTime(cruiseDateTime, cfg.type);
+
+      // Only fire if the target time is within the last 30 minutes and not already sent
+      const targetStart = new Date(targetTime.getTime() - 30 * 60 * 1000);
+      const isDue = now >= targetStart && now <= thirtyMinutesFromNow;
+      const alreadySent = sentSet.has(`${booking.id}|${cfg.type}`);
+
+      if (!isDue || alreadySent) continue;
+
+      const body = reminderBody(cfg.type, booking.cruise_name, booking.cruise_time, booking.cruise_date);
+
+      let pushSuccess = 0;
+      for (const token of deviceTokens) {
+        try {
+          const pushRes = await fetch(EXPO_PUSH_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ to: token, title: cfg.title, body, sound: "default" }),
+          });
+          if (pushRes.ok) pushSuccess++;
+          else {
+            const errBody = await pushRes.text();
+            console.error("[reminders] push failed", token.slice(0, 12) + "...", pushRes.status, errBody.slice(0, 200));
+          }
+        } catch (err) {
+          console.error("[reminders] push error", err);
+        }
+      }
+
+      if (pushSuccess > 0) {
+        await logReminder(env, booking.id, cfg.type);
+        sentSet.add(`${booking.id}|${cfg.type}`);
+        sent++;
+      }
+
+      results.push(`${booking.id.slice(0, 8)} ${cfg.type}: ${pushSuccess}/${deviceTokens.length} delivered`);
+    }
+  }
+
+  console.log(`[reminders] done — ${sent} sent, ${skipped} bookings without linked devices, ${results.length} checks`);
+  return json({ sent, skipped, now: now.toISOString(), results: results.slice(-20) });
 }
 
 type CheckoutBody = {
@@ -658,6 +894,24 @@ export default {
       } catch (err) {
         console.error("notify error", err);
         return json({ error: "notify_error" }, { status: 500 });
+      }
+    }
+
+    if (url.pathname === "/link-device" && request.method === "POST") {
+      try {
+        return await handleLinkDevice(request, env);
+      } catch (err) {
+        console.error("link-device error", err);
+        return json({ error: "link_device_error" }, { status: 500 });
+      }
+    }
+
+    if (url.pathname === "/cron/trip-reminders" && (request.method === "GET" || request.method === "POST")) {
+      try {
+        return await handleTripReminders(request, env);
+      } catch (err) {
+        console.error("trip-reminders error", err);
+        return json({ error: "trip_reminders_error" }, { status: 500 });
       }
     }
 

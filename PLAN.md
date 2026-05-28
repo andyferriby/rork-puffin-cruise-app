@@ -7,6 +7,7 @@
 - [x] **Ratings & Reviews** — Star ratings (1–5) and comments on cruise cards and ticket detail after a cruise
 - [x] **Apple Wallet Passes** — One-tap "Add to Wallet" for boarding passes with QR codes
 - [x] **Push Notification History** — Crew updates, weather alerts, schedule changes in a notifications list
+- [x] **Push Trip Reminders** — Automated push notifications: day before (10am), morning of (8am), 1 hour before, 20 min before departure
 - [x] **QR Boarding Passes** — Generated QR codes on ticket detail, plus admin QR scanner for check-in
 - [x] **Guest Photo Gallery** — Upload from camera or library, view community photos on the home screen
 - [x] **Interactive Map** — Amble Harbour, Coquet Island route, parking, dining, landmarks, category filters, and live boat position

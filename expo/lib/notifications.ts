@@ -4,6 +4,8 @@ import { Platform } from "react-native";
 
 import { supabase } from "@/lib/supabase";
 
+const FUNCTIONS_URL = process.env.EXPO_PUBLIC_RORK_FUNCTIONS_URL!;
+
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
@@ -16,6 +18,7 @@ Notifications.setNotificationHandler({
 export type PushToken = {
   token: string;
   platform: string;
+  email?: string;
   createdAt: string;
 };
 
@@ -47,6 +50,31 @@ export async function registerForPushNotifications(): Promise<string | null> {
   // Persist token to Supabase so the Cloudflare worker can reach it
   await storeToken(token);
   return token;
+}
+
+/**
+ * Link the device's push token to a customer email so trip reminders
+ * can be targeted to the right person. Call this after a user searches
+ * their tickets by email.
+ */
+export async function linkDeviceToEmail(email: string): Promise<void> {
+  try {
+    if (!Device.isDevice) return;
+    const { status } = await Notifications.getPermissionsAsync();
+    if (status !== "granted") return;
+
+    const tokenData = await Notifications.getExpoPushTokenAsync({ projectId: process.env.EXPO_PUBLIC_PROJECT_ID! });
+    const token = tokenData.data;
+
+    await fetch(`${FUNCTIONS_URL}/link-device`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token, email: email.trim().toLowerCase(), platform: Platform.OS }),
+    });
+    console.log("[pn] linked token to", email);
+  } catch (err) {
+    console.error("[pn] link-device error", err);
+  }
 }
 
 async function storeToken(token: string): Promise<void> {

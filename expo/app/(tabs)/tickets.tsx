@@ -6,6 +6,7 @@ import { Alert, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, Text
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { theme } from "@/constants/theme";
 import { walletPassUrl } from "@/lib/api";
+import { linkDeviceToEmail } from "@/lib/notifications";
 import { supabase } from "@/lib/supabase";
 
 type Booking = { id: string; cruise_name: string; cruise_date: string; cruise_time: string; adults: number; children: number; customer_email: string; status: string };
@@ -40,7 +41,18 @@ async function openWalletPass(bookingId: string): Promise<void> {
 export default function TicketsScreen() {
   const insets = useSafeAreaInsets();
   const [email, setEmail] = useState<string>("");
-  const { data = [], isFetching, refetch } = useQuery({ queryKey: ["tickets", email], queryFn: () => fetchBookings(email), enabled: false });
+  const { data = [], isFetching, refetch } = useQuery({
+    queryKey: ["tickets", email],
+    queryFn: async () => {
+      const bookings = await fetchBookings(email);
+      if (bookings.length > 0) {
+        // Link this device to the customer's email for targeted push reminders
+        linkDeviceToEmail(email);
+      }
+      return bookings;
+    },
+    enabled: false,
+  });
   return <View style={styles.root}><ScrollView contentContainerStyle={{ paddingBottom: 36 }} keyboardShouldPersistTaps="handled">
     <View style={[styles.header, { paddingTop: insets.top + 16 }]}><Text style={styles.title}>Tickets</Text><Text style={styles.subtitle}>Find your QR boarding passes by email.</Text></View>
     <View style={styles.searchCard}><View style={styles.field}><Search size={17} color={theme.textMuted}/><TextInput value={email} onChangeText={setEmail} placeholder="Email used for booking" placeholderTextColor={theme.textMuted} autoCapitalize="none" keyboardType="email-address" style={styles.input}/></View><Pressable onPress={() => refetch()} style={styles.button}><Text style={styles.buttonText}>{isFetching ? "Searching…" : "Find tickets"}</Text></Pressable></View>
