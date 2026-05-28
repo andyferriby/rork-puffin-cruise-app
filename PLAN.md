@@ -17,6 +17,7 @@
 - [x] **Refer a Friend** — Unique referral codes, share sheet, £5 credit for both referrer and referred
 - [x] **Arrival Guide** — Comprehensive pre-cruise info: parking, what to bring, check-in, accessibility, weather policies, contact details
 - [x] **Crew Phone Boat Tracker** — Admin controls for start/stop tracking, manual pings, and live customer map marker
+- [x] **Live Trip Mode** — On-the-day hub with check-in info, weather, sea conditions, wildlife spotting, photo memories, and kids activity trail
 
 ## Design
 
@@ -29,6 +30,7 @@ Nautical theme throughout — deep navy blues, sea blue, coral and puffin orange
 - [x] Book — 5-step checkout with Stripe payments
 - [x] Map — harbour map with route, parking, landmarks, category filters, nearby dining, and live boat marker
 - [x] Wildlife — puffin, seal & bird guide for Coquet Island
+- [x] Trip — live trip mode with sea outlook, wildlife sighting log, photo memories, and kids trail
 - [x] Tickets — QR boarding passes, Apple Wallet, email lookup, ratings & reviews, crew updates
 - [x] Profile — loyalty tier card, benefits, refer a friend, arrival guide link, past bookings
 - [x] Admin — PIN-locked schedule/price editor, push notifications, QR scanner, crew boat tracker
