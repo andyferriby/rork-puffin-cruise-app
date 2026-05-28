@@ -3,7 +3,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { ArrowRight } from "lucide-react-native";
 import React, { useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { FlatList, Pressable, StyleSheet, Text, useWindowDimensions, View, type ViewToken } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { theme } from "@/constants/theme";
@@ -26,6 +26,7 @@ export default function OnboardingScreen() {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const [page, setPage] = useState<number>(0);
+  const listRef = React.useRef<FlatList<Slide>>(null);
   const isLast = page === slides.length - 1;
 
   const finish = async (): Promise<void> => {
@@ -33,7 +34,18 @@ export default function OnboardingScreen() {
     router.replace("/(tabs)");
   };
 
-  const snapOffsets = useMemo<number[]>(() => slides.map((_, index) => index * width), [width]);
+  const goNext = (): void => {
+    const next = Math.min(page + 1, slides.length - 1);
+    listRef.current?.scrollToIndex({ index: next, animated: true });
+    setPage(next);
+  };
+
+  const onViewableItemsChanged = useMemo(() => ({ viewableItems }: { viewableItems: ViewToken[] }) => {
+    const first = viewableItems[0];
+    if (first && typeof first.index === "number") setPage(first.index);
+  }, []);
+
+  const viewabilityConfig = useMemo(() => ({ itemVisiblePercentThreshold: 60 }), []);
 
   return (
     <View style={styles.root}>
@@ -41,27 +53,29 @@ export default function OnboardingScreen() {
       <View style={[styles.top, { paddingTop: insets.top + 12 }]}>
         {!isLast ? <Pressable onPress={finish}><Text style={styles.skip}>Skip</Text></Pressable> : <View />}
       </View>
-      <ScrollView
+      <FlatList
+        ref={listRef}
+        data={slides}
+        keyExtractor={(item) => item.title}
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
-        snapToOffsets={snapOffsets}
-        decelerationRate="fast"
-        onMomentumScrollEnd={(event) => setPage(Math.round(event.nativeEvent.contentOffset.x / width))}
-      >
-        {slides.map((slide) => (
-          <View key={slide.title} style={[styles.slide, { width }]}>
-            <LinearGradient colors={slide.colors} style={styles.orb}>
-              <Text style={styles.emoji}>{slide.emoji}</Text>
+        onViewableItemsChanged={onViewableItemsChanged}
+        viewabilityConfig={viewabilityConfig}
+        getItemLayout={(_, index) => ({ length: width, offset: width * index, index })}
+        renderItem={({ item }) => (
+          <View style={[styles.slide, { width }]}>
+            <LinearGradient colors={item.colors} style={styles.orb}>
+              <Text style={styles.emoji}>{item.emoji}</Text>
             </LinearGradient>
-            <Text style={styles.title}>{slide.title}</Text>
-            <Text style={styles.subtitle}>{slide.subtitle}</Text>
+            <Text style={styles.title}>{item.title}</Text>
+            <Text style={styles.subtitle}>{item.subtitle}</Text>
           </View>
-        ))}
-      </ScrollView>
+        )}
+      />
       <View style={[styles.bottom, { paddingBottom: insets.bottom + 28 }]}>
         <View style={styles.dots}>{slides.map((slide, index) => <View key={slide.title} style={[styles.dot, page === index && styles.dotActive]} />)}</View>
-        <Pressable onPress={isLast ? finish : () => setPage(Math.min(page + 1, slides.length - 1))} style={styles.button}>
+        <Pressable onPress={isLast ? finish : goNext} style={styles.button}>
           <Text style={styles.buttonText}>{isLast ? "Get Started" : "Next"}</Text>
           {!isLast && <ArrowRight size={18} color={theme.ink} />}
         </Pressable>
