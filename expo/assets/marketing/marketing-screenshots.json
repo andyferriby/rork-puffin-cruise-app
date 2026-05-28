@@ -1,0 +1,101 @@
+{
+  "appName": "Puffin Cruises",
+  "style": "Bold coastal travel advertising: deep navy, sea blue, puffin orange, warm sand, premium but friendly.",
+  "sourceImages": [
+    {
+      "file": "screenshots/home.png",
+      "label": "Home",
+      "appStoreHeadline": "Book Your Island Cruise",
+      "appStoreSubtitle": "See today’s sailings, passenger reviews, gallery photos and quick booking from one welcoming home screen.",
+      "facebookCaption": "Plan your Coquet Island trip in seconds — sailings, reviews and booking all in the Puffin Cruises app."
+    },
+    {
+      "file": "screenshots/map-tracker.png",
+      "label": "Live Boat Tracker",
+      "appStoreHeadline": "Follow The Boat Live",
+      "appStoreSubtitle": "Track the cruise route, harbour points, parking, dining and live crew-shared boat position on the interactive map.",
+      "facebookCaption": "New: live boat tracking. Follow the Puffin Cruises boat as it heads between Amble Harbour and Coquet Island."
+    },
+    {
+      "file": "screenshots/wildlife.png",
+      "label": "Wildlife Guide",
+      "appStoreHeadline": "Spot Puffins And Seals",
+      "appStoreSubtitle": "Learn what wildlife you might see around Coquet Island with seasonal species cards and fun facts.",
+      "facebookCaption": "Puffins, seals, terns and more — explore Coquet Island wildlife before you step onboard."
+    },
+    {
+      "file": "screenshots/booking.png",
+      "label": "Booking",
+      "appStoreHeadline": "Reserve Seats Fast",
+      "appStoreSubtitle": "Choose your cruise, date, time and passengers with a clear step-by-step booking flow.",
+      "facebookCaption": "Ready for a coastal adventure? Pick your sailing and reserve your seats from the app."
+    },
+    {
+      "file": "screenshots/tickets.png",
+      "label": "Tickets",
+      "appStoreHeadline": "Tickets Ready Onboard",
+      "appStoreSubtitle": "Keep QR boarding passes, cruise details, Wallet actions and crew updates together.",
+      "facebookCaption": "No paper needed — keep your Puffin Cruises ticket and boarding QR ready on your phone."
+    },
+    {
+      "file": "screenshots/profile.png",
+      "label": "Puffin Club",
+      "appStoreHeadline": "Earn Puffin Club Perks",
+      "appStoreSubtitle": "Track loyalty progress, referral rewards, past trips and arrival guidance in your profile.",
+      "facebookCaption": "Join the Puffin Club — earn loyalty perks and share rewards with friends."
+    },
+    {
+      "file": "screenshots/onboarding.png",
+      "label": "Onboarding",
+      "appStoreHeadline": "Everything Before You Sail",
+      "appStoreSubtitle": "A friendly first-launch guide introduces booking, tickets, wildlife, arrival info and live tracking.",
+      "facebookCaption": "First time sailing with us? The app walks you through everything before your trip."
+    },
+    {
+      "file": "screenshots/arrival-guide.png",
+      "label": "Arrival Guide",
+      "appStoreHeadline": "Know Before You Go",
+      "appStoreSubtitle": "Find parking, check-in details, accessibility notes, weather policy and what to bring.",
+      "facebookCaption": "Arrive relaxed — parking, check-in info and what to bring are all in the app."
+    },
+    {
+      "file": "screenshots/boat-island.png",
+      "label": "Boat And Island",
+      "appStoreHeadline": "Sail To Coquet Island",
+      "appStoreSubtitle": "Use this real boat and island image as the hero background for social posts and App Store cover artwork.",
+      "facebookCaption": "Set sail from Amble Harbour to beautiful Coquet Island with Puffin Cruises."
+    },
+    {
+      "file": "screenshots/extra.png",
+      "label": "Extra Creative",
+      "appStoreHeadline": "A Coastal Day Out",
+      "appStoreSubtitle": "Use as a flexible supporting visual for seasonal campaigns, Facebook posts or final App Store slide variations.",
+      "facebookCaption": "Make memories on the Northumberland coast with Puffin Cruises."
+    }
+  ],
+  "recommendedAppStoreDeck": [
+    "Book Your Island Cruise",
+    "Follow The Boat Live",
+    "Spot Puffins And Seals",
+    "Reserve Seats Fast",
+    "Tickets Ready Onboard",
+    "Know Before You Go"
+  ],
+  "recommendedFacebookPosts": [
+    {
+      "theme": "Live tracker launch",
+      "copy": "You can now follow the Puffin Cruises boat live in the app. Perfect for checking the sailing route, harbour points and where the boat is during the trip.",
+      "image": "screenshots/map-tracker.png"
+    },
+    {
+      "theme": "Book a cruise",
+      "copy": "Planning a trip to Coquet Island? Browse sailings, reserve seats and keep your boarding pass ready in the Puffin Cruises app.",
+      "image": "screenshots/home.png"
+    },
+    {
+      "theme": "Wildlife day out",
+      "copy": "Puffins, seals and seabirds are waiting around Coquet Island. Explore the wildlife guide before your cruise.",
+      "image": "screenshots/wildlife.png"
+    }
+  ]
+}
