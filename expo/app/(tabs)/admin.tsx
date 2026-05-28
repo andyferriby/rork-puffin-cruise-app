@@ -1,19 +1,20 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Haptics from "expo-haptics";
+import * as Location from "expo-location";
 import {
   AlertCircle,
   Bell,
   Calendar,
-  ChevronDown,
-  Clock,
   Key,
   Lock,
   LogOut,
+  MapPin,
   Minus,
   Plus,
+  Radio,
   Save,
-  Settings,
+  ShipWheel,
   Trash2,
 } from "lucide-react-native";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
@@ -33,6 +34,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { theme } from "@/constants/theme";
 import { fetchSchedule, type Cruise, type DaySchedule, type ScheduleConfig } from "@/lib/schedule";
+import { fetchBoatLocation, saveBoatLocation, stopBoatTracking, type BoatLocation } from "@/lib/boatTracker";
 import { supabase } from "@/lib/supabase";
 
 const ADMIN_PIN_KEY = "@puffin_admin_pin";
@@ -160,10 +162,18 @@ function AdminEditor({
     queryFn: fetchSchedule,
   });
 
+  const { data: boatLocation } = useQuery({
+    queryKey: ["boat-location"],
+    queryFn: fetchBoatLocation,
+    refetchInterval: 15000,
+  });
+
   const [edited, setEdited] = useState<ScheduleConfig | null>(null);
   const [hasChanges, setHasChanges] = useState<boolean>(false);
   const [saving, setSaving] = useState<boolean>(false);
   const [notifying, setNotifying] = useState<boolean>(false);
+  const [isTrackingBoat, setIsTrackingBoat] = useState<boolean>(false);
+  const [trackingError, setTrackingError] = useState<string | null>(null);
 
   useEffect(() => {
     if (schedule && !edited) {
@@ -289,6 +299,71 @@ function AdminEditor({
     }
   }, [edited, qc]);
 
+  const publishCurrentBoatLocation = useCallback(async () => {
+    setTrackingError(null);
+    const permission = await Location.requestForegroundPermissionsAsync();
+    if (permission.status !== "granted") {
+      setTrackingError("Location permission is needed before crew tracking can start.");
+      return;
+    }
+
+    const position = await Location.getCurrentPositionAsync({
+      accuracy: Location.Accuracy.High,
+    });
+    const nextLocation: BoatLocation = {
+      latitude: position.coords.latitude,
+      longitude: position.coords.longitude,
+      accuracy: position.coords.accuracy ?? null,
+      heading: position.coords.heading ?? null,
+      speed: position.coords.speed ?? null,
+      updatedAt: new Date().toISOString(),
+      isTracking: true,
+    };
+    await saveBoatLocation(nextLocation);
+    qc.invalidateQueries({ queryKey: ["boat-location"] });
+  }, [qc]);
+
+  const handleStartTracking = useCallback(async () => {
+    setIsTrackingBoat(true);
+    try {
+      await publishCurrentBoatLocation();
+      if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (err) {
+      console.error("[admin] start boat tracking", err);
+      setTrackingError("Could not start tracking. Check location permission and signal.");
+      setIsTrackingBoat(false);
+    }
+  }, [publishCurrentBoatLocation]);
+
+  const handleSendBoatPing = useCallback(async () => {
+    try {
+      await publishCurrentBoatLocation();
+    } catch (err) {
+      console.error("[admin] boat ping", err);
+      setTrackingError("Could not send the latest boat position.");
+    }
+  }, [publishCurrentBoatLocation]);
+
+  const handleStopTracking = useCallback(async () => {
+    setIsTrackingBoat(false);
+    try {
+      await stopBoatTracking(boatLocation ?? null);
+      qc.invalidateQueries({ queryKey: ["boat-location"] });
+    } catch (err) {
+      console.error("[admin] stop boat tracking", err);
+      setTrackingError("Could not stop tracking. Please try again.");
+    }
+  }, [boatLocation, qc]);
+
+  useEffect(() => {
+    if (!isTrackingBoat) return;
+    void publishCurrentBoatLocation();
+    const interval = setInterval(() => {
+      void publishCurrentBoatLocation();
+    }, 20000);
+    return () => clearInterval(interval);
+  }, [isTrackingBoat, publishCurrentBoatLocation]);
+
   const handleNotify = useCallback(async () => {
     setNotifying(true);
     try {
@@ -340,6 +415,42 @@ function AdminEditor({
         contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
         keyboardShouldPersistTaps="handled"
       >
+        <Section title="Crew Boat Tracker">
+          <View style={styles.trackerCard}>
+            <View style={styles.trackerHeader}>
+              <View style={[styles.trackerIcon, isTrackingBoat && styles.trackerIconLive]}>
+                {isTrackingBoat ? <Radio size={20} color={theme.white} /> : <ShipWheel size={20} color={theme.sea} />}
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.trackerTitle}>{isTrackingBoat ? "Live tracking is on" : "Boat tracking is off"}</Text>
+                <Text style={styles.trackerSub}>
+                  {boatLocation?.updatedAt
+                    ? `Last update ${new Date(boatLocation.updatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
+                    : "Start when the crew phone is on board."}
+                </Text>
+              </View>
+            </View>
+            {trackingError && <Text style={styles.trackerError}>{trackingError}</Text>}
+            <View style={styles.trackerActions}>
+              <Pressable
+                onPress={isTrackingBoat ? handleStopTracking : handleStartTracking}
+                style={[styles.trackerButton, isTrackingBoat ? styles.stopTrackerButton : styles.startTrackerButton]}
+              >
+                <Text style={[styles.trackerButtonText, isTrackingBoat && styles.stopTrackerText]}>
+                  {isTrackingBoat ? "Stop Tracking" : "Start Boat Tracking"}
+                </Text>
+              </Pressable>
+              <Pressable onPress={handleSendBoatPing} style={styles.pingButton}>
+                <MapPin size={15} color={theme.sea} />
+                <Text style={styles.pingButtonText}>Send Ping</Text>
+              </Pressable>
+            </View>
+            <Text style={styles.trackerNote}>
+              Keep this screen open during the trip for live updates every 20 seconds.
+            </Text>
+          </View>
+        </Section>
+
         {/* Meta */}
         <Section title="Notice">
           <TextInput
@@ -721,6 +832,50 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   addDayBtnText: { color: theme.sea, fontWeight: "700", fontSize: 14 },
+  trackerCard: {
+    backgroundColor: theme.white,
+    borderWidth: 1,
+    borderColor: theme.border,
+    borderRadius: 18,
+    padding: 14,
+    gap: 12,
+  },
+  trackerHeader: { flexDirection: "row", alignItems: "center", gap: 12 },
+  trackerIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 16,
+    backgroundColor: theme.foam,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  trackerIconLive: { backgroundColor: theme.coral },
+  trackerTitle: { fontSize: 16, fontWeight: "800", color: theme.text },
+  trackerSub: { marginTop: 2, color: theme.textMuted, fontSize: 13 },
+  trackerError: { color: theme.coral, fontSize: 13, fontWeight: "700" },
+  trackerActions: { flexDirection: "row", gap: 10 },
+  trackerButton: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 12,
+    borderRadius: 13,
+  },
+  startTrackerButton: { backgroundColor: theme.sea },
+  stopTrackerButton: { backgroundColor: theme.foam, borderWidth: 1.5, borderColor: theme.coral },
+  trackerButtonText: { color: theme.white, fontWeight: "800", fontSize: 14 },
+  stopTrackerText: { color: theme.coral },
+  pingButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingHorizontal: 14,
+    borderRadius: 13,
+    backgroundColor: theme.foam,
+  },
+  pingButtonText: { color: theme.sea, fontWeight: "800", fontSize: 13 },
+  trackerNote: { color: theme.textMuted, fontSize: 12, lineHeight: 17 },
 
   footer: {
     flexDirection: "row",

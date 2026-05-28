@@ -15,9 +15,13 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "app.rork.gpczuon7nhtm91bqwzkc7"
+      "bundleIdentifier": "app.rork.gpczuon7nhtm91bqwzkc7",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Crew can share the boat position during a sailing so customers can see live progress on the map."
+      }
     },
     "android": {
+      "permissions": ["ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION"],
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"

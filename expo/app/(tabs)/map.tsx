@@ -1,5 +1,6 @@
+import { useQuery } from "@tanstack/react-query";
 import { LinearGradient } from "expo-linear-gradient";
-import { Anchor, Car, MapPin, Navigation, Utensils, Waves, X } from "lucide-react-native";
+import { Anchor, Car, MapPin, Navigation, Radio, ShipWheel, Utensils, Waves, X } from "lucide-react-native";
 import React, { useRef, useState } from "react";
 import {
   Animated,
@@ -14,6 +15,7 @@ import {
 import MapView, { Marker, Polyline } from "react-native-maps";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { theme } from "@/constants/theme";
+import { fetchBoatLocation } from "@/lib/boatTracker";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -105,6 +107,12 @@ export default function MapScreen() {
   const [filter, setFilter] = useState<(typeof filters)[number]>("All");
   const [selected, setSelected] = useState<Place | null>(null);
   const cardAnim = useRef(new Animated.Value(0)).current;
+  const { data: boatLocation } = useQuery({
+    queryKey: ["boat-location"],
+    queryFn: fetchBoatLocation,
+    refetchInterval: 15000,
+  });
+  const isBoatLive = Boolean(boatLocation?.isTracking);
 
   const visible = places.filter(
     (p) => filter === "All" || p.category === filter,
@@ -131,6 +139,26 @@ export default function MapScreen() {
       useNativeDriver: true,
     }).start(() => setSelected(null));
   };
+
+  const focusBoat = () => {
+    if (!boatLocation) return;
+    mapRef.current?.animateToRegion(
+      {
+        latitude: boatLocation.latitude,
+        longitude: boatLocation.longitude,
+        latitudeDelta: 0.012,
+        longitudeDelta: 0.012,
+      },
+      500,
+    );
+  };
+
+  const boatUpdatedLabel = boatLocation?.updatedAt
+    ? new Date(boatLocation.updatedAt).toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : null;
 
   const openDirections = (p: Place) => {
     const ll = `${p.coordinate.latitude},${p.coordinate.longitude}`;
@@ -188,6 +216,24 @@ export default function MapScreen() {
               </Marker>
             ))}
 
+            {boatLocation && (
+              <Marker
+                identifier="live-boat"
+                coordinate={{
+                  latitude: boatLocation.latitude,
+                  longitude: boatLocation.longitude,
+                }}
+                title={isBoatLive ? "Puffin Cruises boat" : "Last boat position"}
+                description={boatUpdatedLabel ? `Updated ${boatUpdatedLabel}` : undefined}
+                onPress={focusBoat}
+              >
+                <View style={[styles.boatPin, isBoatLive && styles.boatPinLive]}>
+                  <ShipWheel size={18} color={theme.white} />
+                </View>
+                {isBoatLive && <View style={styles.livePulse} />}
+              </Marker>
+            )}
+
             <Polyline
               coordinates={routeCoords}
               strokeColor={theme.sea}
@@ -196,6 +242,21 @@ export default function MapScreen() {
             />
           </MapView>
         </View>
+
+        {boatLocation && (
+          <Pressable onPress={focusBoat} style={styles.boatStatusCard}>
+            <View style={[styles.boatStatusIcon, isBoatLive && styles.boatStatusIconLive]}>
+              {isBoatLive ? <Radio size={18} color={theme.white} /> : <ShipWheel size={18} color={theme.sea} />}
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.boatStatusTitle}>{isBoatLive ? "Boat is live on the water" : "Boat tracking is paused"}</Text>
+              <Text style={styles.boatStatusSub}>
+                {boatUpdatedLabel ? `Last position update ${boatUpdatedLabel}` : "Waiting for crew to start tracking"}
+              </Text>
+            </View>
+            <Text style={styles.boatStatusAction}>View</Text>
+          </Pressable>
+        )}
 
         {/* Selected location card */}
         {selected && (
@@ -330,6 +391,58 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 4,
   },
+  boatPin: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: theme.deep,
+    borderWidth: 3,
+    borderColor: theme.white,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.28,
+    shadowRadius: 5,
+    elevation: 6,
+  },
+  boatPinLive: { backgroundColor: theme.coral },
+  livePulse: {
+    position: "absolute",
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    borderWidth: 2,
+    borderColor: theme.coral,
+    opacity: 0.35,
+    top: -8,
+    left: -8,
+  },
+  boatStatusCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginHorizontal: 16,
+    marginTop: -4,
+    marginBottom: 12,
+    padding: 14,
+    backgroundColor: theme.white,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: theme.border,
+  },
+  boatStatusIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    backgroundColor: theme.foam,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  boatStatusIconLive: { backgroundColor: theme.coral },
+  boatStatusTitle: { fontSize: 15, fontWeight: "900" as const, color: theme.text },
+  boatStatusSub: { marginTop: 2, fontSize: 12, color: theme.textMuted },
+  boatStatusAction: { color: theme.sea, fontWeight: "900" as const, fontSize: 13 },
   pinArrow: {
     width: 0,
     height: 0,
