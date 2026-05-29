@@ -135,31 +135,28 @@ export async function registerForPushNotifications(forceRefresh = false): Promis
     console.log("[pn:step2] got token", expoToken.slice(0, 12) + "...");
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
+    const code = (err as { code?: string }).code ?? "";
     const stack = err instanceof Error ? err.stack ?? "" : "";
     console.error("[pn:step2] getExpoPushTokenAsync failed:", msg);
+    console.error("[pn:step2] error code:", code || "(none)");
     if (stack) console.error("[pn:step2] stack:", stack.slice(0, 500));
 
     result.failedStep = "expo_push_token";
     result.permissionStatus = "error";
 
-    // ── Build a more specific, actionable error ──
-    if (msg.includes("APNs") || msg.includes("remote notification") || msg.includes("register")) {
+    // Always include the raw error so we can diagnose, plus actionable guidance
+    const rawDetail = msg.length > 200 ? msg.slice(0, 180) + "…" : msg;
+
+    if (msg.includes("APNs") || msg.includes("remote notification") || code === "E_NO_APNS_TOKEN") {
       result.error =
-        "Push notifications aren't enabled in this app build. " +
-        "Make sure the expo-notifications plugin is in app.json, then republish the app through Rork.";
-    } else if (msg.includes("Network") || msg.includes("fetch") || msg.includes("timeout") || msg.includes("connect") || msg.includes("network")) {
-      // Network errors from getExpoPushTokenAsync usually mean the native
-      // push capability was never registered with APNs, which manifests as
-      // a "network" error because Expo can't reach its push service without
-      // an APNs token. The fix is republishing with the push plugin.
+        `Push capability missing from this build. The expo-notifications plugin is in app.json, but the published build may not include it. Republish the app through Rork and try again.\n\nTechnical: ${rawDetail}`;
+    } else if (msg.includes("permission") || msg.includes("not authorized") || msg.includes("denied")) {
       result.error =
-        "Push registration failed — the app may need to be republished with push capability. " +
-        "Ensure expo-notifications is in app.json, then republish through Rork. " +
-        "If the app was recently published with the plugin, check your internet connection and try again.";
-    } else if (msg.includes("projectId") || msg.includes("project")) {
-      result.error = "Push project is misconfigured. Please contact support.";
+        `Notification permission was denied during token registration. This can happen if you dismissed the system dialog. Try again — the system prompt should re-appear.\n\nTechnical: ${rawDetail}`;
     } else {
-      result.error = msg.length > 150 ? `Push token failed: ${msg.slice(0, 120)}…` : `Push token failed: ${msg}`;
+      // Show the raw error so we can actually diagnose it
+      result.error =
+        `Push token request failed.\n\nError: ${rawDetail}${code ? `\nCode: ${code}` : ""}\n\nThe expo-notifications plugin is in app.json. If this is a network error, check your internet connection. If it persists, the app may need to be republished through Rork.`;
     }
     cachedResult = result;
     return result;

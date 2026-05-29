@@ -63,9 +63,11 @@ export default function ProfileScreen() {
     } else if (result.registered) {
       Alert.alert("Notifications Enabled", "You'll now receive trip reminders, weather alerts, and boarding updates.");
     } else if (result.failedStep === "expo_push_token") {
-      Alert.alert("Push Setup Needed", result.error ?? "Could not register for push notifications. Ensure expo-notifications is in app.json and republish through Rork.");
+      // Show the actual error — the message now includes the raw technical detail
+      const msg = result.error ?? "Push token request failed.";
+      Alert.alert("Push Setup Needed", msg.length > 300 ? msg.slice(0, 280) + "…" : msg);
     } else if (result.error) {
-      Alert.alert("Registration Issue", result.error);
+      Alert.alert("Registration Issue", result.error.length > 300 ? result.error.slice(0, 280) + "…" : result.error);
     }
   };
 
