@@ -5,6 +5,7 @@ import * as Haptics from "expo-haptics";
 import * as Location from "expo-location";
 import {
   AlertCircle,
+  Anchor,
   Bell,
   Calendar,
   CheckCircle,
@@ -20,6 +21,7 @@ import {
   ShipWheel,
   Ticket,
   Trash2,
+  Users,
   X,
 } from "lucide-react-native";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -54,6 +56,31 @@ type ScannedBooking = {
   children: number;
   status: string;
 };
+
+type BoardedBooking = {
+  id: string;
+  customer_name: string;
+  cruise_name: string;
+  cruise_date: string;
+  cruise_time: string;
+  adults: number;
+  children: number;
+  status: string;
+};
+
+async function fetchBoardedBookings(): Promise<BoardedBooking[]> {
+  const { data, error } = await supabase
+    .from("bookings")
+    .select("id, customer_name, cruise_name, cruise_date, cruise_time, adults, children, status")
+    .eq("status", "boarded")
+    .order("cruise_date", { ascending: false })
+    .limit(100);
+  if (error) {
+    console.error("[admin] fetch boarded", error.message);
+    return [];
+  }
+  return (data ?? []) as BoardedBooking[];
+}
 
 async function handleBarcodeScan(
   data: string,
@@ -227,6 +254,26 @@ function AdminEditor({
   const [markingBoarded, setMarkingBoarded] = useState<boolean>(false);
   const [cameraPerm, requestCameraPerm] = useCameraPermissions();
   const scanLockRef = useRef<boolean>(false);
+
+  // On-board list
+  const {
+    data: boardedBookings = [],
+    refetch: refetchBoarded,
+  } = useQuery({
+    queryKey: ["boarded-bookings"],
+    queryFn: fetchBoardedBookings,
+    staleTime: 10_000,
+  });
+
+  const boardedTotals = useMemo(() => {
+    let adults = 0;
+    let children = 0;
+    for (const b of boardedBookings) {
+      adults += b.adults;
+      children += b.children;
+    }
+    return { adults, children };
+  }, [boardedBookings]);
 
   const handleBarcodeScanned = useCallback(
     (result: BarcodeScanningResult) => {
@@ -495,6 +542,78 @@ function AdminEditor({
           </View>
         </Section>
 
+        {/* On Board List */}
+        <Section title="Currently On Board">
+          <View style={styles.onboardCard}>
+            {boardedBookings.length === 0 ? (
+              <View style={styles.onboardEmpty}>
+                <Anchor size={28} color={theme.textMuted} />
+                <Text style={styles.onboardEmptyTitle}>No one on board yet</Text>
+                <Text style={styles.onboardEmptySub}>
+                  Scan and mark tickets as boarded to build the passenger manifest.
+                </Text>
+              </View>
+            ) : (
+              <>
+                {boardedBookings.map((b, i) => (
+                  <View
+                    key={b.id}
+                    style={[
+                      styles.onboardRow,
+                      i < boardedBookings.length - 1 && styles.onboardRowBorder,
+                    ]}
+                  >
+                    <View style={styles.onboardRowLeft}>
+                      <Text style={styles.onboardName} numberOfLines={1}>
+                        {b.customer_name}
+                      </Text>
+                      <Text style={styles.onboardCruise} numberOfLines={1}>
+                        {b.cruise_name} · {b.cruise_time}
+                      </Text>
+                    </View>
+                    <View style={styles.onboardRowRight}>
+                      <View style={styles.onboardCountBadge}>
+                        <Users size={11} color={theme.sea} />
+                        <Text style={styles.onboardCountText}>
+                          {b.adults + b.children}
+                        </Text>
+                      </View>
+                      <Text style={styles.onboardBreakdown}>
+                        {b.adults}A / {b.children}C
+                      </Text>
+                    </View>
+                  </View>
+                ))}
+
+                {/* Totals */}
+                <View style={styles.onboardDivider} />
+                <View style={styles.onboardTotals}>
+                  <View style={styles.onboardTotalItem}>
+                    <Text style={styles.onboardTotalLabel}>Total on board</Text>
+                    <Text style={styles.onboardTotalValue}>
+                      {boardedTotals.adults + boardedTotals.children}
+                    </Text>
+                  </View>
+                  <View style={styles.onboardTotalSplit}>
+                    <View style={styles.onboardTotalChip}>
+                      <Text style={styles.onboardTotalChipLabel}>Adults</Text>
+                      <Text style={styles.onboardTotalChipValue}>
+                        {boardedTotals.adults}
+                      </Text>
+                    </View>
+                    <View style={[styles.onboardTotalChip, styles.onboardTotalChipAlt]}>
+                      <Text style={styles.onboardTotalChipLabel}>Children</Text>
+                      <Text style={styles.onboardTotalChipValue}>
+                        {boardedTotals.children}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              </>
+            )}
+          </View>
+        </Section>
+
         {/* Meta */}
         {/* Ticket Scanner */}
         <Section title="Ticket Scanner">
@@ -587,6 +706,7 @@ function AdminEditor({
                           .eq("id", scannedBooking.id);
                         if (error) throw error;
                         setScannedBooking({ ...scannedBooking, status: "boarded" });
+                        refetchBoarded();
                         if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                       } catch (err) {
                         console.error("[admin] mark boarded", err);
@@ -1226,5 +1346,131 @@ const styles = StyleSheet.create({
     color: theme.sea,
     fontWeight: "700",
     fontSize: 13,
+  },
+
+  // On Board list
+  onboardCard: {
+    backgroundColor: theme.white,
+    borderWidth: 1,
+    borderColor: theme.border,
+    borderRadius: 18,
+    padding: 14,
+    gap: 2,
+  },
+  onboardEmpty: {
+    alignItems: "center",
+    paddingVertical: 24,
+    gap: 8,
+  },
+  onboardEmptyTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: theme.text,
+  },
+  onboardEmptySub: {
+    fontSize: 13,
+    color: theme.textMuted,
+    textAlign: "center",
+    lineHeight: 18,
+  },
+  onboardRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 10,
+    gap: 10,
+  },
+  onboardRowBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: theme.border,
+  },
+  onboardRowLeft: {
+    flex: 1,
+    minWidth: 0,
+  },
+  onboardName: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: theme.text,
+  },
+  onboardCruise: {
+    fontSize: 12,
+    color: theme.textMuted,
+    marginTop: 2,
+  },
+  onboardRowRight: {
+    alignItems: "flex-end",
+    gap: 2,
+  },
+  onboardCountBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: theme.foam,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  onboardCountText: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: theme.sea,
+  },
+  onboardBreakdown: {
+    fontSize: 10,
+    fontWeight: "600",
+    color: theme.textMuted,
+  },
+  onboardDivider: {
+    height: 1,
+    backgroundColor: theme.border,
+    marginVertical: 10,
+  },
+  onboardTotals: {
+    gap: 10,
+  },
+  onboardTotalItem: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  onboardTotalLabel: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: theme.textMuted,
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+  },
+  onboardTotalValue: {
+    fontSize: 24,
+    fontWeight: "900",
+    color: theme.text,
+  },
+  onboardTotalSplit: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  onboardTotalChip: {
+    flex: 1,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: theme.foam,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  onboardTotalChipAlt: {
+    backgroundColor: "#FFF3F0",
+  },
+  onboardTotalChipLabel: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: theme.sea,
+  },
+  onboardTotalChipValue: {
+    fontSize: 18,
+    fontWeight: "900",
+    color: theme.text,
   },
 });
