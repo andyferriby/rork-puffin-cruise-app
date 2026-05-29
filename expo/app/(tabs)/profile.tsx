@@ -63,7 +63,7 @@ export default function ProfileScreen() {
     } else if (result.registered) {
       Alert.alert("Notifications Enabled", "You'll now receive trip reminders, weather alerts, and boarding updates.");
     } else if (result.failedStep === "expo_push_token") {
-      Alert.alert("Push Setup Needed", result.error ?? "Could not register for push notifications. The development build may need to be rebuilt.");
+      Alert.alert("Push Setup Needed", result.error ?? "Could not register for push notifications. Ensure expo-notifications is in app.json and republish through Rork.");
     } else if (result.error) {
       Alert.alert("Registration Issue", result.error);
     }
