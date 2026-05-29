@@ -38,7 +38,13 @@ export default function RootLayout() {
     const prepare = async (): Promise<void> => {
       const hasSeenOnboarding = await AsyncStorage.getItem(ONBOARDING_KEY);
       await SplashScreen.hideAsync();
-      registerForPushNotifications();
+      try {
+        const token = await registerForPushNotifications();
+        if (token) console.log("[app] push token registered", token.slice(0, 12) + "...");
+        else console.log("[app] push token not available (simulator or permission denied)");
+      } catch (err) {
+        console.error("[app] push registration failed", err);
+      }
       if (!hasSeenOnboarding) {
         router.replace("/onboarding");
       }

@@ -444,11 +444,22 @@ function AdminEditor({
           body: "Check the app for the latest Puffin Cruises schedule.",
         }),
       });
+      const result = (await res.json()) as { sent?: number; failed?: number; message?: string; totalTokens?: number };
       if (!res.ok) {
-        const txt = await res.text();
-        throw new Error(txt);
+        throw new Error(result.message ?? `Status ${res.status}`);
       }
-      Alert.alert("Sent", `Push notifications have been dispatched.`);
+      const sent = result.sent ?? 0;
+      const failed = result.failed ?? 0;
+      if (sent === 0 && failed === 0) {
+        Alert.alert(
+          "No devices",
+          "No registered devices found. Make sure at least one customer has opened the app with push notifications enabled.",
+        );
+      } else if (failed > 0) {
+        Alert.alert("Partially sent", `${sent} sent, ${failed} failed. Some devices may not receive the notification.`);
+      } else {
+        Alert.alert("Sent", `${sent} push notification${sent === 1 ? "" : "s"} dispatched.`);
+      }
     } catch (err) {
       console.error("[admin] notify", err);
       Alert.alert("Notify failed", err instanceof Error ? err.message : "Please try again.");

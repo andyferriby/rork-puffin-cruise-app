@@ -459,24 +459,45 @@ type ReminderType = "day_before" | "morning_of" | "hour_before" | "20min_before"
 
 async function getPushTokens(env: Env): Promise<{ tokens: StoredPushToken[]; raw: Record<string, unknown> }> {
   const configRes = await supa(env, `/app_config?key=eq.push_tokens&select=value`, { method: "GET" });
-  if (!configRes.ok) return { tokens: [], raw: {} };
+  if (!configRes.ok) {
+    const errText = await configRes.text().catch(() => "");
+    console.error("[push] getPushTokens supabase read failed", configRes.status, errText.slice(0, 500));
+    return { tokens: [], raw: {} };
+  }
   const rows = (await configRes.json()) as { value: unknown }[];
+  console.log("[push] getPushTokens rows", rows.length, "raw value type", typeof rows[0]?.value);
+
+  if (rows.length === 0) {
+    console.log("[push] no push_tokens row in app_config — no device has registered yet");
+    return { tokens: [], raw: {} };
+  }
+
   const value = rows[0]?.value;
 
   // Tolerate both shapes: a legacy raw array, or the object { tokens: [...] }.
   if (Array.isArray(value)) {
+    console.log("[push] found legacy array format with", value.length, "tokens");
+    // Return raw as empty so callers reconstruct the object shape
     return { tokens: value as StoredPushToken[], raw: {} };
   }
   const raw = (value ?? {}) as Record<string, unknown>;
   const tokens: StoredPushToken[] = Array.isArray(raw?.tokens) ? (raw.tokens as StoredPushToken[]) : [];
+  console.log("[push] getPushTokens returning", tokens.length, "tokens");
   return { tokens, raw };
 }
 
 async function putPushTokens(env: Env, value: Record<string, unknown>): Promise<void> {
-  await supa(env, `/app_config`, {
+  // Use upsert via POST with Prefer: resolution=merge-duplicates so it
+  // won't fail when the row already exists (unlike plain POST).
+  const res = await supa(env, `/app_config`, {
     method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates" },
     body: JSON.stringify({ key: "push_tokens", value }),
   });
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    console.error("[push] putPushTokens failed", res.status, errText.slice(0, 500));
+  }
 }
 
 async function handleNotify(request: Request, env: Env): Promise<Response> {
@@ -522,8 +543,12 @@ async function handleNotify(request: Request, env: Env): Promise<Response> {
     }),
   });
 
-  await putPushTokens(env, { ...raw, lastNotifiedAt: new Date().toISOString() });
-  return json({ sent, failed });
+  // Only persist lastNotifiedAt if we have tokens so we don't corrupt the row
+  if (tokens.length > 0) {
+    await putPushTokens(env, { ...raw, tokens, lastNotifiedAt: new Date().toISOString() });
+  }
+  console.log("[push] notify result — sent:", sent, "failed:", failed, "total tokens:", tokens.length);
+  return json({ sent, failed, totalTokens: tokens.length });
 }
 
 // ── Device linking ──────────────────────────────────────────────
@@ -694,8 +719,11 @@ async function handleTripReminders(request: Request, env: Env): Promise<Response
   const reminderLogs = await getReminderLogs(env);
   const sentSet = new Set(reminderLogs.map((l) => `${l.bookingId}|${l.type}`));
 
+  console.log("[reminders] found", tokens.length, "push tokens, checking", bookings.length, "paid bookings");
+
   let sent = 0;
   let skipped = 0;
+  let noLinkedDevice = 0;
   const results: string[] = [];
 
   for (const booking of bookings) {
@@ -709,7 +737,7 @@ async function handleTripReminders(request: Request, env: Env): Promise<Response
       .map((t) => t.token);
 
     if (deviceTokens.length === 0) {
-      skipped++;
+      noLinkedDevice++;
       continue;
     }
 
@@ -753,8 +781,8 @@ async function handleTripReminders(request: Request, env: Env): Promise<Response
     }
   }
 
-  console.log(`[reminders] done — ${sent} sent, ${skipped} bookings without linked devices, ${results.length} checks`);
-  return json({ sent, skipped, now: now.toISOString(), results: results.slice(-20) });
+  console.log(`[reminders] done — ${sent} sent, ${noLinkedDevice} bookings without linked devices, ${results.length} checks`);
+  return json({ sent, noLinkedDevice, now: now.toISOString(), results: results.slice(-20) });
 }
 
 type CheckoutBody = {
@@ -909,6 +937,41 @@ export default {
       } catch (err) {
         console.error("link-device error", err);
         return json({ error: "link_device_error" }, { status: 500 });
+      }
+    }
+
+    if (url.pathname === "/debug/push-status" && request.method === "GET") {
+      try {
+        const { tokens } = await getPushTokens(env);
+        const reminderLogs = await getReminderLogs(env);
+        // Count bookings that would be checked by cron
+        const fromDate = new Date();
+        fromDate.setDate(fromDate.getDate() - 1);
+        const toDate = new Date();
+        toDate.setDate(toDate.getDate() + 3);
+        const bookingsRes = await supa(
+          env,
+          `/bookings?status=eq.paid&cruise_date=gte.${fromDate.toISOString().slice(0, 10)}&cruise_date=lte.${toDate.toISOString().slice(0, 10)}&select=id,customer_email`,
+          { method: "GET" },
+        );
+        let paidBookingCount = 0;
+        const emailsWithTokens = new Set(tokens.filter((t) => t.email).map((t) => t.email?.toLowerCase()));
+        let linkableBookings = 0;
+        if (bookingsRes.ok) {
+          const bookings = (await bookingsRes.json()) as { customer_email: string }[];
+          paidBookingCount = bookings.length;
+          linkableBookings = bookings.filter((b) => emailsWithTokens.has(b.customer_email.trim().toLowerCase())).length;
+        }
+        return json({
+          totalTokens: tokens.length,
+          tokensWithEmail: tokens.filter((t) => t.email).length,
+          recentReminderLogs: reminderLogs.slice(-20),
+          paidBookingsInWindow: paidBookingCount,
+          bookingsWithLinkedDevice: linkableBookings,
+        });
+      } catch (err) {
+        console.error("debug push-status error", err);
+        return json({ error: "debug_error" }, { status: 500 });
       }
     }
 
