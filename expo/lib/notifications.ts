@@ -1,6 +1,6 @@
 import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
-import { Platform } from "react-native";
+import { Alert, Linking, Platform } from "react-native";
 
 const FUNCTIONS_URL = process.env.EXPO_PUBLIC_RORK_FUNCTIONS_URL!;
 
@@ -20,34 +20,83 @@ export type PushToken = {
   createdAt: string;
 };
 
+export type PushRegistrationResult = {
+  token: string | null;
+  isDevice: boolean;
+  permissionStatus: "granted" | "denied" | "undetermined" | "error";
+  registered: boolean;
+  error: string | null;
+};
+
 /**
- * Register for push notifications and persist the Expo token to Supabase.
- * Returns the token string, or null if unavailable (simulator, denied, etc.).
+ * Register for push notifications and persist the Expo token to the backend.
+ * Returns a diagnostic result object so the caller can show appropriate UI.
  */
-export async function registerForPushNotifications(): Promise<string | null> {
+export async function registerForPushNotifications(): Promise<PushRegistrationResult> {
+  const result: PushRegistrationResult = {
+    token: null,
+    isDevice: false,
+    permissionStatus: "undetermined",
+    registered: false,
+    error: null,
+  };
+
   if (!Device.isDevice) {
     console.log("[pn] not a physical device, skipping");
-    return null;
+    return result;
   }
+  result.isDevice = true;
 
-  const { status: existingStatus } = await Notifications.getPermissionsAsync();
-  let finalStatus = existingStatus;
-  if (existingStatus !== "granted") {
-    const { status } = await Notifications.requestPermissionsAsync();
-    finalStatus = status;
+  try {
+    const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    let finalStatus = existingStatus;
+    if (existingStatus !== "granted") {
+      const { status } = await Notifications.requestPermissionsAsync();
+      finalStatus = status;
+    }
+    result.permissionStatus = finalStatus === "granted" ? "granted" : (finalStatus === "denied" ? "denied" : "undetermined");
+
+    if (finalStatus !== "granted") {
+      console.log("[pn] permission denied — status:", finalStatus);
+      result.error = finalStatus === "denied"
+        ? "Notifications are disabled. Enable them in iOS Settings to receive trip reminders."
+        : "Could not get notification permission.";
+      return result;
+    }
+
+    const tokenData = await Notifications.getExpoPushTokenAsync({ projectId: process.env.EXPO_PUBLIC_PROJECT_ID! });
+    result.token = tokenData.data;
+    console.log("[pn] got token", tokenData.data.slice(0, 12) + "...");
+
+    // Persist token to backend
+    const registered = await storeToken(tokenData.data);
+    result.registered = registered;
+    if (!registered) {
+      result.error = "Could not register token with the server. Check your connection and try again.";
+    }
+
+    return result;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("[pn] registration error", message);
+    result.permissionStatus = "error";
+    result.error = message;
+    return result;
   }
-  if (finalStatus !== "granted") {
-    console.log("[pn] permission denied");
-    return null;
-  }
+}
 
-  const tokenData = await Notifications.getExpoPushTokenAsync({ projectId: process.env.EXPO_PUBLIC_PROJECT_ID! });
-  const token = tokenData.data;
-  console.log("[pn] got token", token.slice(0, 12) + "...");
-
-  // Persist token to Supabase so the Cloudflare worker can reach it
-  await storeToken(token);
-  return token;
+/**
+ * Shows an alert guiding the user to iOS Settings if notifications are denied.
+ */
+export function showPermissionDeniedAlert(): void {
+  Alert.alert(
+    "Notifications Disabled",
+    "To receive trip reminders, weather alerts, and boarding updates, enable notifications in your device settings.",
+    [
+      { text: "Not Now", style: "cancel" },
+      { text: "Open Settings", onPress: () => { void Linking.openSettings(); } },
+    ],
+  );
 }
 
 /**
@@ -77,10 +126,9 @@ export async function linkDeviceToEmail(email: string): Promise<void> {
 
 /**
  * Store the Expo push token via the Cloudflare backend worker.
- * We route through the backend instead of writing to Supabase directly
- * to avoid RLS INSERT restrictions on the app_config table.
+ * Returns true if the token was successfully persisted.
  */
-async function storeToken(token: string): Promise<void> {
+async function storeToken(token: string): Promise<boolean> {
   try {
     const url = `${FUNCTIONS_URL}/register-device`;
     console.log("[pn] storeToken calling", url);
@@ -93,13 +141,15 @@ async function storeToken(token: string): Promise<void> {
     const resText = await res.text().catch(() => "");
     if (!res.ok) {
       console.error("[pn] storeToken FAILED", res.status, resText.slice(0, 300));
-      return;
+      return false;
     }
 
     let result: { ok: boolean; totalTokens: number; persisted?: boolean } = { ok: false, totalTokens: 0 };
     try { result = JSON.parse(resText); } catch { /* ignore parse errors */ }
-    console.log("[pn] storeToken OK — total:", result.totalTokens, "persisted:", result.persisted, "response:", resText.slice(0, 200));
+    console.log("[pn] storeToken OK — total:", result.totalTokens, "persisted:", result.persisted);
+    return result.ok || result.persisted === true;
   } catch (err) {
     console.error("[pn] storeToken network error", String(err));
+    return false;
   }
 }
