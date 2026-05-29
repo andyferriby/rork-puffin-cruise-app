@@ -486,18 +486,25 @@ async function getPushTokens(env: Env): Promise<{ tokens: StoredPushToken[]; raw
   return { tokens, raw };
 }
 
-async function putPushTokens(env: Env, value: Record<string, unknown>): Promise<void> {
+async function putPushTokens(env: Env, value: Record<string, unknown>): Promise<boolean> {
   // Use upsert via POST with Prefer: resolution=merge-duplicates so it
   // won't fail when the row already exists (unlike plain POST).
+  const body = JSON.stringify({ key: "push_tokens", value });
+  console.log("[push] putPushTokens sending", body.length, "bytes, value keys:", Object.keys(value));
+
   const res = await supa(env, `/app_config`, {
     method: "POST",
     headers: { Prefer: "resolution=merge-duplicates" },
-    body: JSON.stringify({ key: "push_tokens", value }),
+    body,
   });
+
+  const resText = await res.text().catch(() => "");
   if (!res.ok) {
-    const errText = await res.text().catch(() => "");
-    console.error("[push] putPushTokens failed", res.status, errText.slice(0, 500));
+    console.error("[push] putPushTokens FAILED", res.status, resText.slice(0, 500));
+    return false;
   }
+  console.log("[push] putPushTokens OK", res.status, resText.slice(0, 200));
+  return true;
 }
 
 async function handleNotify(request: Request, env: Env): Promise<Response> {
@@ -548,7 +555,7 @@ async function handleNotify(request: Request, env: Env): Promise<Response> {
     await putPushTokens(env, { ...raw, tokens, lastNotifiedAt: new Date().toISOString() });
   }
   console.log("[push] notify result — sent:", sent, "failed:", failed, "total tokens:", tokens.length);
-  return json({ sent, failed, totalTokens: tokens.length });
+  return json({ sent, failed, totalTokens: tokens.length, succeeded: tokens.length > 0 });
 }
 
 // ── Device registration ─────────────────────────────────────────
@@ -570,10 +577,10 @@ async function handleRegisterDevice(request: Request, env: Env): Promise<Respons
   });
 
   const trimmed = filtered.slice(-500);
-  await putPushTokens(env, { ...raw, tokens: trimmed });
+  const writeOk = await putPushTokens(env, { ...raw, tokens: trimmed });
 
-  console.log("[register-device] stored token, total:", trimmed.length);
-  return json({ ok: true, totalTokens: trimmed.length });
+  console.log("[register-device] stored token, total:", trimmed.length, "writeOk:", writeOk);
+  return json({ ok: true, totalTokens: trimmed.length, persisted: writeOk });
 }
 
 // ── Device linking ──────────────────────────────────────────────
@@ -597,10 +604,10 @@ async function handleLinkDevice(request: Request, env: Env): Promise<Response> {
   });
 
   const trimmed = filtered.slice(-500);
-  await putPushTokens(env, { ...raw, tokens: trimmed });
+  const writeOk = await putPushTokens(env, { ...raw, tokens: trimmed });
 
-  console.log("[link-device] linked token to", normalizedEmail);
-  return json({ ok: true, email: normalizedEmail });
+  console.log("[link-device] linked token to", normalizedEmail, "writeOk:", writeOk);
+  return json({ ok: true, email: normalizedEmail, persisted: writeOk });
 }
 
 // ── Trip reminder cron ──────────────────────────────────────────
@@ -993,6 +1000,31 @@ export default {
           writeTest = { ok: false, status: -1, detail: String(err) };
         }
 
+        // Raw Supabase read — show exactly what the push_tokens row looks like
+        let rawSupabaseRow: unknown = null;
+        let rawSupabaseStatus = 0;
+        try {
+          const rawRes = await supa(env, `/app_config?key=eq.push_tokens&select=*`, { method: "GET" });
+          rawSupabaseStatus = rawRes.status;
+          rawSupabaseRow = await rawRes.json().catch(() => null);
+        } catch (err) {
+          rawSupabaseRow = String(err);
+        }
+
+        // Try to force-init the push_tokens row if it doesn't exist yet
+        let forceInitResult: unknown = null;
+        if (tokens.length === 0) {
+          try {
+            const initOk = await putPushTokens(env, { tokens: [], initializedAt: new Date().toISOString() });
+            forceInitResult = { attempted: true, ok: initOk };
+          } catch (err) {
+            forceInitResult = { attempted: true, error: String(err) };
+          }
+        }
+
+        // Re-read after force-init
+        const recheck = forceInitResult ? await getPushTokens(env) : null;
+
         // Count bookings that would be checked by cron
         const fromDate = new Date();
         fromDate.setDate(fromDate.getDate() - 1);
@@ -1019,6 +1051,11 @@ export default {
           bookingsWithLinkedDevice: linkableBookings,
           supabaseWriteTest: writeTest,
           rawTokensShape: typeof raw?.tokens,
+          rawSupabaseRow,
+          rawSupabaseStatus,
+          forceInitResult,
+          recheckTokens: recheck ? recheck.tokens.length : null,
+          supabaseUrl: env.EXPO_PUBLIC_SUPABASE_URL ? `${env.EXPO_PUBLIC_SUPABASE_URL.slice(0, 25)}...` : "not set",
         });
       } catch (err) {
         console.error("debug push-status error", err);

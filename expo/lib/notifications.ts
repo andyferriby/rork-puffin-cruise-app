@@ -82,21 +82,24 @@ export async function linkDeviceToEmail(email: string): Promise<void> {
  */
 async function storeToken(token: string): Promise<void> {
   try {
-    const res = await fetch(`${FUNCTIONS_URL}/register-device`, {
+    const url = `${FUNCTIONS_URL}/register-device`;
+    console.log("[pn] storeToken calling", url);
+    const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ token, platform: Platform.OS }),
     });
 
+    const resText = await res.text().catch(() => "");
     if (!res.ok) {
-      const errBody = await res.text().catch(() => "");
-      console.error("[pn] storeToken failed", res.status, errBody.slice(0, 300));
+      console.error("[pn] storeToken FAILED", res.status, resText.slice(0, 300));
       return;
     }
 
-    const result = (await res.json()) as { ok: boolean; totalTokens: number };
-    console.log("[pn] token stored via backend, total tokens:", result.totalTokens);
+    let result: { ok: boolean; totalTokens: number; persisted?: boolean } = { ok: false, totalTokens: 0 };
+    try { result = JSON.parse(resText); } catch { /* ignore parse errors */ }
+    console.log("[pn] storeToken OK — total:", result.totalTokens, "persisted:", result.persisted, "response:", resText.slice(0, 200));
   } catch (err) {
-    console.error("[pn] storeToken network error", err);
+    console.error("[pn] storeToken network error", String(err));
   }
 }
