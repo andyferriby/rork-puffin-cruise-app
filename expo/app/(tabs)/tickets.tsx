@@ -2,8 +2,10 @@ import { useQuery } from "@tanstack/react-query";
 import { Image } from "expo-image";
 import { Anchor, CheckCircle, QrCode, Search, Ticket, Wallet } from "lucide-react-native";
 import React, { useMemo, useState } from "react";
-import { Alert, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { File, Paths } from "expo-file-system";
+import * as Sharing from "expo-sharing";
 import { theme } from "@/constants/theme";
 import { walletPassUrl } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
@@ -27,14 +29,24 @@ async function openWalletPass(bookingId: string): Promise<void> {
     return;
   }
 
-  const url = walletPassUrl(bookingId);
-  const canOpen = await Linking.canOpenURL(url);
-  if (!canOpen) {
-    Alert.alert("Wallet unavailable", "This device cannot open Apple Wallet passes right now.");
-    return;
-  }
+  try {
+    const url = walletPassUrl(bookingId);
+    const dest = Paths.cache;
+    const file = await File.downloadFileAsync(url, dest);
 
-  await Linking.openURL(url);
+    const isAvailable = await Sharing.isAvailableAsync();
+    if (!isAvailable) {
+      Alert.alert("Sharing unavailable", "Cannot open share sheet on this device.");
+      return;
+    }
+
+    await Sharing.shareAsync(file.uri, {
+      UTI: "com.apple.pkpass",
+    });
+  } catch (err) {
+    console.error("[wallet] download failed", err);
+    Alert.alert("Download failed", "Could not download the boarding pass. Please check your connection and try again.");
+  }
 }
 
 export default function TicketsScreen() {
