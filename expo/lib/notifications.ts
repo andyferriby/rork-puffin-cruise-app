@@ -142,10 +142,18 @@ export async function registerForPushNotifications(forceRefresh = false): Promis
     result.failedStep = "expo_push_token";
     result.permissionStatus = "error";
 
+    // ── Build a more specific, actionable error ──
     if (msg.includes("APNs") || msg.includes("remote notification") || msg.includes("register")) {
-      result.error = "Push capability missing. The development build may need to be rebuilt after adding the expo-notifications plugin.";
-    } else if (msg.includes("Network") || msg.includes("fetch") || msg.includes("timeout") || msg.includes("connect")) {
-      result.error = "Cannot reach push servers. Check your internet connection and try again.";
+      result.error = "Push notifications aren't enabled in this app build. Please rebuild the app (npx expo run:ios) after adding the expo-notifications plugin.";
+    } else if (msg.includes("Network") || msg.includes("fetch") || msg.includes("timeout") || msg.includes("connect") || msg.includes("network")) {
+      // Network errors from getExpoPushTokenAsync usually mean the native
+      // push capability was never registered with APNs, which manifests as
+      // a "network" error because Expo can't reach its push service without
+      // an APNs token. The fix is a rebuild with the plugin.
+      result.error =
+        "Push registration failed — this usually means the app needs to be rebuilt with push capability. " +
+        "Try rebuilding the development build (npx expo run:ios or eas build). " +
+        "If you've already rebuilt, check your internet connection and try again.";
     } else if (msg.includes("projectId") || msg.includes("project")) {
       result.error = "Push project is misconfigured. Please contact support.";
     } else {
