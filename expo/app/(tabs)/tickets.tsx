@@ -17,7 +17,7 @@ function qrCodeUrl(bookingId: string): string {
 
 async function fetchBookings(email: string): Promise<Booking[]> {
   if (!email.trim()) return [];
-  const { data, error } = await supabase.from("bookings").select("id, cruise_name, cruise_date, cruise_time, adults, children, customer_email, status").ilike("customer_email", email.trim()).order("cruise_date", { ascending: false }).limit(20);
+  const { data, error } = await supabase.from("bookings").select("id, cruise_name, cruise_date, cruise_time, adults, children, customer_email, status").ilike("customer_email", email.trim()).in("status", ["paid", "boarded"]).order("cruise_date", { ascending: false }).limit(20);
   if (error) { console.error("[tickets] fetch", error.message); return []; }
   return (data ?? []) as Booking[];
 }

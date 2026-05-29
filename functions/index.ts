@@ -926,6 +926,31 @@ async function handleWebhook(request: Request, env: Env): Promise<Response> {
       }
     }
   }
+
+  if (event.type === "charge.refunded") {
+    const charge = event.data.object as { payment_intent?: string; refunded: boolean };
+    const paymentIntent = charge.payment_intent;
+    if (paymentIntent && charge.refunded) {
+      // Find booking by stripe_payment_intent and mark as refunded
+      const bookingsRes = await supa(
+        env,
+        `/bookings?stripe_payment_intent=eq.${encodeURIComponent(paymentIntent)}&select=id&limit=1`,
+        { method: "GET" },
+      );
+      if (bookingsRes.ok) {
+        const bookings = (await bookingsRes.json()) as { id: string }[];
+        if (bookings[0]) {
+          await supa(env, `/bookings?id=eq.${bookings[0].id}`, {
+            method: "PATCH",
+            body: JSON.stringify({ status: "refunded" }),
+          });
+          console.log("booking marked refunded", bookings[0].id, "pi:", paymentIntent.slice(0, 12) + "...");
+        } else {
+          console.log("[webhook] refund for unknown payment_intent:", paymentIntent.slice(0, 12) + "...");
+        }
+      }
+    }
+  }
   return new Response(null, { status: 200 });
 }
 
