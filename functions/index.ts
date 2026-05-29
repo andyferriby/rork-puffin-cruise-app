@@ -551,6 +551,31 @@ async function handleNotify(request: Request, env: Env): Promise<Response> {
   return json({ sent, failed, totalTokens: tokens.length });
 }
 
+// ── Device registration ─────────────────────────────────────────
+
+async function handleRegisterDevice(request: Request, env: Env): Promise<Response> {
+  const body = (await request.json()) as { token: string; platform: string };
+  if (!body.token) {
+    return json({ error: "missing token" }, { status: 400 });
+  }
+
+  const { tokens, raw } = await getPushTokens(env);
+
+  // Remove duplicate and add new token
+  const filtered = tokens.filter((t) => t.token !== body.token);
+  filtered.push({
+    token: body.token,
+    platform: body.platform ?? "unknown",
+    createdAt: new Date().toISOString(),
+  });
+
+  const trimmed = filtered.slice(-500);
+  await putPushTokens(env, { ...raw, tokens: trimmed });
+
+  console.log("[register-device] stored token, total:", trimmed.length);
+  return json({ ok: true, totalTokens: trimmed.length });
+}
+
 // ── Device linking ──────────────────────────────────────────────
 
 async function handleLinkDevice(request: Request, env: Env): Promise<Response> {
@@ -931,6 +956,15 @@ export default {
       }
     }
 
+    if (url.pathname === "/register-device" && request.method === "POST") {
+      try {
+        return await handleRegisterDevice(request, env);
+      } catch (err) {
+        console.error("register-device error", err);
+        return json({ error: "register_device_error" }, { status: 500 });
+      }
+    }
+
     if (url.pathname === "/link-device" && request.method === "POST") {
       try {
         return await handleLinkDevice(request, env);
@@ -942,8 +976,23 @@ export default {
 
     if (url.pathname === "/debug/push-status" && request.method === "GET") {
       try {
-        const { tokens } = await getPushTokens(env);
+        const { tokens, raw } = await getPushTokens(env);
         const reminderLogs = await getReminderLogs(env);
+
+        // Test: can we write to app_config?
+        let writeTest: { ok: boolean; status: number; detail: string } = { ok: false, status: 0, detail: "not attempted" };
+        try {
+          const testRes = await supa(env, `/app_config`, {
+            method: "POST",
+            headers: { Prefer: "resolution=merge-duplicates" },
+            body: JSON.stringify({ key: "push_tokens_test", value: { _test: true, at: new Date().toISOString() } }),
+          });
+          const testBody = await testRes.text().catch(() => "");
+          writeTest = { ok: testRes.ok, status: testRes.status, detail: testBody.slice(0, 300) };
+        } catch (err) {
+          writeTest = { ok: false, status: -1, detail: String(err) };
+        }
+
         // Count bookings that would be checked by cron
         const fromDate = new Date();
         fromDate.setDate(fromDate.getDate() - 1);
@@ -968,6 +1017,8 @@ export default {
           recentReminderLogs: reminderLogs.slice(-20),
           paidBookingsInWindow: paidBookingCount,
           bookingsWithLinkedDevice: linkableBookings,
+          supabaseWriteTest: writeTest,
+          rawTokensShape: typeof raw?.tokens,
         });
       } catch (err) {
         console.error("debug push-status error", err);

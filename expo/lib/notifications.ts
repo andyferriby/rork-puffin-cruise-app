@@ -2,8 +2,6 @@ import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
 
-import { supabase } from "@/lib/supabase";
-
 const FUNCTIONS_URL = process.env.EXPO_PUBLIC_RORK_FUNCTIONS_URL!;
 
 Notifications.setNotificationHandler({
@@ -77,57 +75,28 @@ export async function linkDeviceToEmail(email: string): Promise<void> {
   }
 }
 
+/**
+ * Store the Expo push token via the Cloudflare backend worker.
+ * We route through the backend instead of writing to Supabase directly
+ * to avoid RLS INSERT restrictions on the app_config table.
+ */
 async function storeToken(token: string): Promise<void> {
   try {
-    // Read existing config from app_config. The backend expects the shape
-    // { tokens: PushToken[], ...meta }, so we always read/write that object
-    // (tolerating a legacy raw-array value for backwards compatibility).
-    const { data, error: readError } = await supabase
-      .from("app_config")
-      .select("value")
-      .eq("key", "push_tokens")
-      .maybeSingle();
+    const res = await fetch(`${FUNCTIONS_URL}/register-device`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token, platform: Platform.OS }),
+    });
 
-    if (readError) {
-      console.error("[pn] storeToken read error", readError.message);
+    if (!res.ok) {
+      const errBody = await res.text().catch(() => "");
+      console.error("[pn] storeToken failed", res.status, errBody.slice(0, 300));
       return;
     }
 
-    const value = data?.value as unknown;
-    const raw: Record<string, unknown> =
-      value && typeof value === "object" && !Array.isArray(value)
-        ? (value as Record<string, unknown>)
-        : {};
-    const existing: PushToken[] = Array.isArray(value)
-      ? (value as PushToken[])
-      : Array.isArray((raw as { tokens?: unknown }).tokens)
-        ? ((raw as { tokens: PushToken[] }).tokens)
-        : [];
-
-    const filtered = existing.filter((t) => t.token !== token);
-    filtered.push({
-      token,
-      platform: Platform.OS,
-      createdAt: new Date().toISOString(),
-    });
-
-    // Keep only last 500 tokens to avoid unbounded growth
-    const trimmed = filtered.slice(-500);
-
-    const { error: upsertError } = await supabase.from("app_config").upsert(
-      {
-        key: "push_tokens",
-        value: { ...raw, tokens: trimmed } as unknown as Record<string, unknown>,
-      },
-      { onConflict: "key" },
-    );
-
-    if (upsertError) {
-      console.error("[pn] storeToken upsert error", upsertError.message);
-    } else {
-      console.log("[pn] token stored successfully, total tokens:", trimmed.length);
-    }
+    const result = (await res.json()) as { ok: boolean; totalTokens: number };
+    console.log("[pn] token stored via backend, total tokens:", result.totalTokens);
   } catch (err) {
-    console.error("[pn] storeToken unexpected error", err);
+    console.error("[pn] storeToken network error", err);
   }
 }
