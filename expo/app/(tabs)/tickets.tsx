@@ -6,7 +6,6 @@ import { Alert, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, Text
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { theme } from "@/constants/theme";
 import { walletPassUrl } from "@/lib/api";
-import { linkDeviceToEmail } from "@/lib/notifications";
 import { supabase } from "@/lib/supabase";
 
 type Booking = { id: string; cruise_name: string; cruise_date: string; cruise_time: string; adults: number; children: number; customer_email: string; status: string };
@@ -45,10 +44,7 @@ export default function TicketsScreen() {
     queryKey: ["tickets", email],
     queryFn: async () => {
       const bookings = await fetchBookings(email);
-      if (bookings.length > 0) {
-        // Link this device to the customer's email for targeted push reminders
-        linkDeviceToEmail(email);
-      }
+
       return bookings;
     },
     enabled: false,

@@ -217,7 +217,6 @@ function AdminEditor({
   const [edited, setEdited] = useState<ScheduleConfig | null>(null);
   const [hasChanges, setHasChanges] = useState<boolean>(false);
   const [saving, setSaving] = useState<boolean>(false);
-  const [notifying, setNotifying] = useState<boolean>(false);
   const [isTrackingBoat, setIsTrackingBoat] = useState<boolean>(false);
   const [trackingError, setTrackingError] = useState<string | null>(null);
 
@@ -432,41 +431,6 @@ function AdminEditor({
     }, 20000);
     return () => clearInterval(interval);
   }, [isTrackingBoat, publishCurrentBoatLocation]);
-
-  const handleNotify = useCallback(async () => {
-    setNotifying(true);
-    try {
-      const res = await fetch(`${BASE}/notify`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: "New sailing times posted! 🐧",
-          body: "Check the app for the latest Puffin Cruises schedule.",
-        }),
-      });
-      const result = (await res.json()) as { sent?: number; failed?: number; message?: string; totalTokens?: number };
-      if (!res.ok) {
-        throw new Error(result.message ?? `Status ${res.status}`);
-      }
-      const sent = result.sent ?? 0;
-      const failed = result.failed ?? 0;
-      if (sent === 0 && failed === 0) {
-        Alert.alert(
-          "No devices",
-          "No registered devices found. Make sure at least one customer has opened the app with push notifications enabled.",
-        );
-      } else if (failed > 0) {
-        Alert.alert("Partially sent", `${sent} sent, ${failed} failed. Some devices may not receive the notification.`);
-      } else {
-        Alert.alert("Sent", `${sent} push notification${sent === 1 ? "" : "s"} dispatched.`);
-      }
-    } catch (err) {
-      console.error("[admin] notify", err);
-      Alert.alert("Notify failed", err instanceof Error ? err.message : "Please try again.");
-    } finally {
-      setNotifying(false);
-    }
-  }, []);
 
   if (isLoading || !edited) {
     return (
@@ -845,25 +809,6 @@ function AdminEditor({
       {/* Sticky footer */}
       <View style={[styles.footer, { paddingBottom: insets.bottom + 12 }]}>
         <Pressable
-          onPress={handleNotify}
-          disabled={notifying}
-          style={({ pressed }) => [
-            styles.footerBtn,
-            styles.notifyBtn,
-            (pressed || notifying) && { opacity: 0.8 },
-          ]}
-        >
-          {notifying ? (
-            <ActivityIndicator color={theme.sea} size="small" />
-          ) : (
-            <Bell size={18} color={theme.sea} />
-          )}
-          <Text style={styles.notifyBtnText}>
-            {notifying ? "Sending..." : "Notify"}
-          </Text>
-        </Pressable>
-
-        <Pressable
           onPress={handleSave}
           disabled={!hasChanges || saving}
           style={({ pressed }) => [
@@ -1116,14 +1061,6 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 14,
   },
-  notifyBtn: {
-    flex: 0,
-    paddingHorizontal: 20,
-    backgroundColor: theme.foam,
-    borderWidth: 1.5,
-    borderColor: theme.sea,
-  },
-  notifyBtnText: { color: theme.sea, fontWeight: "700", fontSize: 14 },
   saveBtn: {
     flex: 1,
     backgroundColor: theme.sea,
