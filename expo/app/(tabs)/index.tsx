@@ -1,7 +1,7 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { Link, router } from "expo-router";
 import { Anchor, Calendar, MapPin, Phone, Star, Tv } from "lucide-react-native";
-import React, { useCallback } from "react";
+import React, { useCallback, useRef } from "react";
 import {
   Image,
   Linking,
@@ -17,9 +17,13 @@ import { theme } from "@/constants/theme";
 import { fetchSchedule } from "@/lib/schedule";
 import { useQuery } from "@tanstack/react-query";
 
+const ADMIN_TAP_WINDOW_MS = 1200;
+
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { data } = useQuery({ queryKey: ["schedule"], queryFn: fetchSchedule });
+  const adminTapCountRef = useRef<number>(0);
+  const adminTapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const callOffice = useCallback(() => {
     const phone = data?.contactPhone ?? "07752 861914";
@@ -55,7 +59,29 @@ export default function HomeScreen() {
               <Tv size={12} color={theme.white} />
               <Text style={styles.badgeText}>As seen on Robson Green&apos;s Weekend Escapes</Text>
             </View>
-            <Text style={styles.heroTitle}>Dave Gray&apos;s{"\n"}Puffin Cruises</Text>
+            <Pressable
+              onPress={() => {
+                adminTapCountRef.current += 1;
+                if (adminTapCountRef.current >= 3) {
+                  adminTapCountRef.current = 0;
+                  if (adminTapTimerRef.current) {
+                    clearTimeout(adminTapTimerRef.current);
+                    adminTapTimerRef.current = null;
+                  }
+                  router.push("/(tabs)/admin");
+                  return;
+                }
+                if (adminTapTimerRef.current) {
+                  clearTimeout(adminTapTimerRef.current);
+                }
+                adminTapTimerRef.current = setTimeout(() => {
+                  adminTapCountRef.current = 0;
+                  adminTapTimerRef.current = null;
+                }, ADMIN_TAP_WINDOW_MS);
+              }}
+            >
+              <Text style={styles.heroTitle}>Dave Gray&apos;s{"\n"}Puffin Cruises</Text>
+            </Pressable>
             <Text style={styles.heroSub}>
               Family-run wildlife adventures around Coquet Island for over 40 years.
             </Text>
