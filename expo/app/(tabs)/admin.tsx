@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import { BarcodeScanningResult, CameraView, useCameraPermissions } from "expo-camera";
 import * as Haptics from "expo-haptics";
 import * as Location from "expo-location";
@@ -246,6 +247,7 @@ function AdminEditor({
   const [saving, setSaving] = useState<boolean>(false);
   const [isTrackingBoat, setIsTrackingBoat] = useState<boolean>(false);
   const [trackingError, setTrackingError] = useState<string | null>(null);
+  const [pickerDayIdx, setPickerDayIdx] = useState<number | null>(null);
 
   // Scanner state
   const [scannerOpen, setScannerOpen] = useState<boolean>(false);
@@ -362,15 +364,17 @@ function AdminEditor({
 
   const addDay = useCallback(() => {
     if (!edited) return;
-    const lastDate = edited.days[edited.days.length - 1]?.date;
-    const next = lastDate
-      ? new Date(new Date(lastDate).getTime() + 86400000).toISOString().slice(0, 10)
-      : new Date().toISOString().slice(0, 10);
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, "0");
+    const dd = String(today.getDate()).padStart(2, "0");
+    const newIdx = edited.days.length;
     setEdited({
       ...edited,
-      days: [...edited.days, { date: next, times: [] }],
+      days: [...edited.days, { date: `${yyyy}-${mm}-${dd}`, times: [] }],
     });
     setHasChanges(true);
+    setPickerDayIdx(newIdx);
   }, [edited]);
 
   const removeDay = useCallback(
@@ -378,6 +382,7 @@ function AdminEditor({
       if (!edited) return;
       setEdited({ ...edited, days: edited.days.filter((_, i) => i !== idx) });
       setHasChanges(true);
+      setPickerDayIdx(null);
     },
     [edited],
   );
@@ -857,15 +862,21 @@ function AdminEditor({
         {/* Days */}
         <Section title="Sailing Days">
           {edited.days.map((d, dayIdx) => (
-            <View key={d.date} style={styles.dayCard}>
+            <View key={`${d.date}-${dayIdx}`} style={styles.dayCard}>
               <View style={styles.dayCardHeader}>
-                <TextInput
-                  value={d.date}
-                  onChangeText={(v) => updateDay(dayIdx, { date: v })}
-                  placeholder="YYYY-MM-DD"
-                  placeholderTextColor={theme.textMuted}
-                  style={[styles.inlineField, { flex: 1 }]}
-                />
+                <Pressable
+                  onPress={() => setPickerDayIdx(pickerDayIdx === dayIdx ? null : dayIdx)}
+                  style={styles.dateField}
+                >
+                  <Calendar size={14} color={theme.sea} />
+                  <Text style={styles.dateFieldText}>
+                    {(() => {
+                      const parts = d.date.split("-");
+                      if (parts.length !== 3) return d.date;
+                      return `${parts[2]}/${parts[1]}/${parts[0]}`;
+                    })()}
+                  </Text>
+                </Pressable>
                 <TextInput
                   value={d.weather ?? ""}
                   onChangeText={(v) => updateDay(dayIdx, { weather: v || undefined })}
@@ -877,6 +888,43 @@ function AdminEditor({
                   <Trash2 size={16} color={theme.coral} />
                 </Pressable>
               </View>
+
+              {pickerDayIdx === dayIdx && (
+                <View style={styles.datePickerWrapper}>
+                  <View style={styles.datePickerHeader}>
+                    <Text style={styles.datePickerTitle}>Select Date</Text>
+                    <Pressable onPress={() => setPickerDayIdx(null)} hitSlop={8}>
+                      <X size={16} color={theme.textMuted} />
+                    </Pressable>
+                  </View>
+                  <DateTimePicker
+                    value={(() => {
+                      const p = d.date.split("-");
+                      if (p.length === 3) return new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+                      return new Date();
+                    })()}
+                    mode="date"
+                    display={Platform.OS === "ios" ? "inline" : "default"}
+                    themeVariant="light"
+                    onChange={(event: DateTimePickerEvent, selectedDate?: Date) => {
+                      if (Platform.OS === "android") {
+                        setPickerDayIdx(null);
+                      }
+                      if (event.type === "dismissed") {
+                        setPickerDayIdx(null);
+                        return;
+                      }
+                      if (selectedDate) {
+                        const yyyy = selectedDate.getFullYear();
+                        const mm = String(selectedDate.getMonth() + 1).padStart(2, "0");
+                        const dd = String(selectedDate.getDate()).padStart(2, "0");
+                        updateDay(dayIdx, { date: `${yyyy}-${mm}-${dd}` });
+                        if (Platform.OS === "ios") setPickerDayIdx(null);
+                      }
+                    }}
+                  />
+                </View>
+              )}
 
               {d.times.map((t, timeIdx) => (
                 <View key={`${t.time}-${timeIdx}`} style={styles.timeRow}>
@@ -1016,6 +1064,45 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   pinBtnText: { color: theme.white, fontWeight: "700", fontSize: 15 },
+
+  // Date picker
+  dateField: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: theme.white,
+    borderWidth: 1.5,
+    borderColor: theme.sea,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  dateFieldText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: theme.text,
+  },
+  datePickerWrapper: {
+    backgroundColor: theme.white,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: theme.border,
+    overflow: "hidden",
+  },
+  datePickerHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingTop: 14,
+    paddingBottom: 4,
+  },
+  datePickerTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: theme.sea,
+  },
 
   // Editor
   editorHeader: {
