@@ -8,7 +8,7 @@ import { Alert, Linking, Pressable, ScrollView, Share, StyleSheet, Text, TextInp
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { theme } from "@/constants/theme";
 import { supabase } from "@/lib/supabase";
-import { registerForPushNotifications, showPermissionDeniedAlert, type PushRegistrationResult } from "@/lib/notifications";
+import { registerForPushNotifications, resetPushRegistrationCache, showPermissionDeniedAlert, type PushRegistrationResult } from "@/lib/notifications";
 
 type Booking = { id: string; cruise_date: string; cruise_name: string; customer_email: string; status: string };
 type Tier = { name: string; emoji: string; minTrips: number; colors: readonly [string, string]; benefits: string[] };
@@ -53,7 +53,8 @@ export default function ProfileScreen() {
 
   const handleRetryPush = async (): Promise<void> => {
     setPushChecking(true);
-    const result = await registerForPushNotifications();
+    resetPushRegistrationCache();
+    const result = await registerForPushNotifications(true);
     setPushResult(result);
     setPushChecking(false);
 
@@ -61,6 +62,8 @@ export default function ProfileScreen() {
       showPermissionDeniedAlert();
     } else if (result.registered) {
       Alert.alert("Notifications Enabled", "You'll now receive trip reminders, weather alerts, and boarding updates.");
+    } else if (result.failedStep === "expo_push_token") {
+      Alert.alert("Push Setup Needed", result.error ?? "Could not register for push notifications. The development build may need to be rebuilt.");
     } else if (result.error) {
       Alert.alert("Registration Issue", result.error);
     }

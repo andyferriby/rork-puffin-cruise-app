@@ -26,54 +26,78 @@ export type PushRegistrationResult = {
   permissionStatus: "granted" | "denied" | "undetermined" | "error";
   registered: boolean;
   error: string | null;
+  /** Which step failed, for diagnostics */
+  failedStep: "none" | "device_check" | "permission_request" | "expo_push_token" | "backend_store" | "unknown";
 };
+
+// Cache so repeated calls don't re-request permissions or re-fetch the token
+let cachedResult: PushRegistrationResult | null = null;
+
+/** Clear cached result so the next call will run the full flow again. */
+export function resetPushRegistrationCache(): void {
+  cachedResult = null;
+}
 
 /**
  * Register for push notifications and persist the Expo token to the backend.
- * Returns a diagnostic result object so the caller can show appropriate UI.
+ * Results are cached — subsequent calls return the same result unless
+ * forceRefresh is true or resetPushRegistrationCache() was called.
  */
-export async function registerForPushNotifications(): Promise<PushRegistrationResult> {
+export async function registerForPushNotifications(forceRefresh = false): Promise<PushRegistrationResult> {
+  if (cachedResult && !forceRefresh) {
+    console.log("[pn] using cached result —", cachedResult.permissionStatus, cachedResult.registered ? "registered" : "not registered");
+    return cachedResult;
+  }
+
   const result: PushRegistrationResult = {
     token: null,
     isDevice: false,
     permissionStatus: "undetermined",
     registered: false,
     error: null,
+    failedStep: "none",
   };
 
+  // ── Step 0: device check ──────────────────────────────────────
   if (!Device.isDevice) {
-    console.log("[pn] not a physical device, skipping");
-    result.permissionStatus = "undetermined";
+    console.log("[pn:step0] not a physical device, skipping");
+    result.failedStep = "device_check";
     result.error = "Push notifications require a physical device.";
+    cachedResult = result;
     return result;
   }
   result.isDevice = true;
 
   const projectId = process.env.EXPO_PUBLIC_PROJECT_ID;
   if (!projectId) {
-    console.error("[pn] missing EXPO_PUBLIC_PROJECT_ID");
+    console.error("[pn:step0] missing EXPO_PUBLIC_PROJECT_ID");
+    result.failedStep = "device_check";
     result.permissionStatus = "error";
     result.error = "Push notification project ID is not configured.";
+    cachedResult = result;
     return result;
   }
 
+  // ── Step 1: get or request permission ─────────────────────────
   try {
-    // Step 1 – get or request permission
     const { status: existingStatus } = await Notifications.getPermissionsAsync();
     let finalStatus = existingStatus;
+    console.log("[pn:step1] existing permission:", existingStatus);
 
     if (existingStatus !== "granted") {
-      // Only request if not already denied — iOS won't re-prompt after denial
       if (existingStatus === "denied") {
-        console.log("[pn] permission previously denied — cannot re-prompt");
+        console.log("[pn:step1] permission previously denied — cannot re-prompt");
         result.permissionStatus = "denied";
+        result.failedStep = "permission_request";
         result.error = "Notifications are disabled. Open iOS Settings to enable them.";
+        cachedResult = result;
         return result;
       }
 
+      console.log("[pn:step1] requesting permission...");
       const { status } = await Notifications.requestPermissionsAsync();
       finalStatus = status;
-      console.log("[pn] requestPermissionsAsync returned:", finalStatus);
+      console.log("[pn:step1] requestPermissionsAsync returned:", finalStatus);
     }
 
     result.permissionStatus =
@@ -82,44 +106,72 @@ export async function registerForPushNotifications(): Promise<PushRegistrationRe
       : "undetermined";
 
     if (finalStatus !== "granted") {
-      console.log("[pn] permission not granted — status:", finalStatus);
+      console.log("[pn:step1] permission not granted — status:", finalStatus);
+      result.failedStep = "permission_request";
       result.error =
         finalStatus === "denied"
           ? "Notifications are disabled. Open iOS Settings to enable them."
           : "Could not get notification permission.";
+      cachedResult = result;
       return result;
     }
-
-    // Step 2 – get Expo push token
-    console.log("[pn] permission granted, requesting Expo push token...");
-    const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
-    result.token = tokenData.data;
-    console.log("[pn] got token", tokenData.data.slice(0, 12) + "...");
-
-    // Step 3 – persist token to backend
-    const registered = await storeToken(tokenData.data);
-    result.registered = registered;
-    if (!registered) {
-      result.error = "Could not register with push server. Check your connection.";
-    }
-
-    return result;
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.error("[pn] registration error —", message);
-
-    // Translate known Expo push token errors into user-friendly messages
-    if (message.includes("Failed to get push token") || message.includes("GCM")) {
-      result.error = "Push notification setup is incomplete. Please restart the app.";
-    } else if (message.includes("Network") || message.includes("fetch")) {
-      result.error = "Network error. Check your connection and try again.";
-    } else {
-      result.error = message.length > 150 ? "An unexpected error occurred. Please try again." : message;
-    }
-
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[pn:step1] permission error:", msg);
+    result.failedStep = "permission_request";
     result.permissionStatus = "error";
+    result.error = `Permission check failed: ${msg.length > 100 ? msg.slice(0, 100) + "…" : msg}`;
+    cachedResult = result;
     return result;
   }
+
+  // ── Step 2: get Expo push token ──────────────────────────────
+  let expoToken: string;
+  try {
+    console.log("[pn:step2] requesting Expo push token with projectId:", projectId.slice(0, 8) + "...");
+    const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
+    expoToken = tokenData.data;
+    result.token = expoToken;
+    console.log("[pn:step2] got token", expoToken.slice(0, 12) + "...");
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    const stack = err instanceof Error ? err.stack ?? "" : "";
+    console.error("[pn:step2] getExpoPushTokenAsync failed:", msg);
+    if (stack) console.error("[pn:step2] stack:", stack.slice(0, 500));
+
+    result.failedStep = "expo_push_token";
+    result.permissionStatus = "error";
+
+    if (msg.includes("APNs") || msg.includes("remote notification") || msg.includes("register")) {
+      result.error = "Push capability missing. The development build may need to be rebuilt after adding the expo-notifications plugin.";
+    } else if (msg.includes("Network") || msg.includes("fetch") || msg.includes("timeout") || msg.includes("connect")) {
+      result.error = "Cannot reach push servers. Check your internet connection and try again.";
+    } else if (msg.includes("projectId") || msg.includes("project")) {
+      result.error = "Push project is misconfigured. Please contact support.";
+    } else {
+      result.error = msg.length > 150 ? `Push token failed: ${msg.slice(0, 120)}…` : `Push token failed: ${msg}`;
+    }
+    cachedResult = result;
+    return result;
+  }
+
+  // ── Step 3: persist token to backend ─────────────────────────
+  try {
+    const registered = await storeToken(expoToken);
+    result.registered = registered;
+    if (!registered) {
+      result.failedStep = "backend_store";
+      result.error = "Push token obtained but could not register with server. Check your connection.";
+    }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[pn:step3] storeToken threw:", msg);
+    result.failedStep = "backend_store";
+    result.error = "Could not save push token to server.";
+  }
+
+  cachedResult = result;
+  return result;
 }
 
 /**
