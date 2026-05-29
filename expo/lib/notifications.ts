@@ -43,44 +43,81 @@ export async function registerForPushNotifications(): Promise<PushRegistrationRe
 
   if (!Device.isDevice) {
     console.log("[pn] not a physical device, skipping");
+    result.permissionStatus = "undetermined";
+    result.error = "Push notifications require a physical device.";
     return result;
   }
   result.isDevice = true;
 
+  const projectId = process.env.EXPO_PUBLIC_PROJECT_ID;
+  if (!projectId) {
+    console.error("[pn] missing EXPO_PUBLIC_PROJECT_ID");
+    result.permissionStatus = "error";
+    result.error = "Push notification project ID is not configured.";
+    return result;
+  }
+
   try {
+    // Step 1 – get or request permission
     const { status: existingStatus } = await Notifications.getPermissionsAsync();
     let finalStatus = existingStatus;
+
     if (existingStatus !== "granted") {
+      // Only request if not already denied — iOS won't re-prompt after denial
+      if (existingStatus === "denied") {
+        console.log("[pn] permission previously denied — cannot re-prompt");
+        result.permissionStatus = "denied";
+        result.error = "Notifications are disabled. Open iOS Settings to enable them.";
+        return result;
+      }
+
       const { status } = await Notifications.requestPermissionsAsync();
       finalStatus = status;
+      console.log("[pn] requestPermissionsAsync returned:", finalStatus);
     }
-    result.permissionStatus = finalStatus === "granted" ? "granted" : (finalStatus === "denied" ? "denied" : "undetermined");
+
+    result.permissionStatus =
+      finalStatus === "granted" ? "granted"
+      : finalStatus === "denied" ? "denied"
+      : "undetermined";
 
     if (finalStatus !== "granted") {
-      console.log("[pn] permission denied — status:", finalStatus);
-      result.error = finalStatus === "denied"
-        ? "Notifications are disabled. Enable them in iOS Settings to receive trip reminders."
-        : "Could not get notification permission.";
+      console.log("[pn] permission not granted — status:", finalStatus);
+      result.error =
+        finalStatus === "denied"
+          ? "Notifications are disabled. Open iOS Settings to enable them."
+          : "Could not get notification permission.";
       return result;
     }
 
-    const tokenData = await Notifications.getExpoPushTokenAsync({ projectId: process.env.EXPO_PUBLIC_PROJECT_ID! });
+    // Step 2 – get Expo push token
+    console.log("[pn] permission granted, requesting Expo push token...");
+    const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
     result.token = tokenData.data;
     console.log("[pn] got token", tokenData.data.slice(0, 12) + "...");
 
-    // Persist token to backend
+    // Step 3 – persist token to backend
     const registered = await storeToken(tokenData.data);
     result.registered = registered;
     if (!registered) {
-      result.error = "Could not register token with the server. Check your connection and try again.";
+      result.error = "Could not register with push server. Check your connection.";
     }
 
     return result;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    console.error("[pn] registration error", message);
+    console.error("[pn] registration error —", message);
+
+    // Translate known Expo push token errors into user-friendly messages
+    if (message.includes("Failed to get push token") || message.includes("GCM")) {
+      result.error = "Push notification setup is incomplete. Please restart the app.";
+    } else if (message.includes("Network") || message.includes("fetch")) {
+      result.error = "Network error. Check your connection and try again.";
+    } else {
+      result.error = message.length > 150 ? "An unexpected error occurred. Please try again." : message;
+    }
+
     result.permissionStatus = "error";
-    result.error = message;
     return result;
   }
 }
