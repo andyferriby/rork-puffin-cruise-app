@@ -598,11 +598,11 @@ type NotifyBody = {
   heading: string;
   message: string;
   target: "all" | "boarded";
+  appId: string;
 };
 
 async function handleNotify(request: Request, env: Env): Promise<Response> {
   const apiKey = env.ONESIGNAL_REST_API_KEY?.trim();
-  const appId = env.ONESIGNAL_APP_ID?.trim() ?? env.ONESIGNAL_REST_API_KEY ? "" : "";
 
   if (!apiKey) {
     return json({ error: "onesignal_not_configured", message: "ONESIGNAL_REST_API_KEY is not set in the backend environment." }, { status: 503 });
@@ -610,10 +610,12 @@ async function handleNotify(request: Request, env: Env): Promise<Response> {
 
   const body = (await request.json()) as NotifyBody;
   if (!body.message?.trim()) return json({ error: "missing_message" }, { status: 400 });
+  if (!body.appId?.trim()) return json({ error: "missing_app_id" }, { status: 400 });
 
   const heading = body.heading?.trim() || "Puffin Cruises";
   const message = body.message.trim();
   const target = body.target === "boarded" ? "boarded" : "all";
+  const appId = body.appId.trim();
 
   // Fetch target emails from Supabase
   let filter = "in.(paid,boarded)";
@@ -646,7 +648,7 @@ async function handleNotify(request: Request, env: Env): Promise<Response> {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        app_id: appId || undefined,
+        app_id: appId,
         headings: { en: heading },
         contents: { en: message },
         include_external_user_ids: emails,

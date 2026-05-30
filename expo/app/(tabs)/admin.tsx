@@ -1020,6 +1020,7 @@ function NotifySection() {
           heading: "Puffin Cruises",
           message: notifyMessage.trim(),
           target: notifyTarget,
+          appId: process.env.EXPO_PUBLIC_ONESIGNAL_APP_ID ?? "",
         }),
       });
       if (!res.ok) {
