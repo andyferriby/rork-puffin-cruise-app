@@ -16,11 +16,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "app.rork.gpczuon7nhtm91bqwzkc7",
-      "entitlements": {
-        "com.apple.security.application-groups": [
-          "group.app.rork.gpczuon7nhtm91bqwzkc7.onesignal"
-        ]
-      },
+      "entitlements": {},
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Crew can share the boat position during a sailing so customers can see live progress on the map.",
         "NSCameraUsageDescription": "Scan QR codes on boarding passes to check in passengers.",
@@ -42,7 +38,8 @@
       [
         "onesignal-expo-plugin",
         {
-          "mode": "production"
+          "mode": "production",
+          "disableNSE": true
         }
       ],
       [
