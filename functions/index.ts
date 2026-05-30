@@ -20,6 +20,8 @@ type Env = {
   APPLE_WWDR_PEM?: string;
   RESEND_API_KEY?: string;
   RESEND_FROM_EMAIL?: string;
+  ONESIGNAL_REST_API_KEY?: string;
+  ONESIGNAL_APP_ID?: string;
 };
 
 const APPLE_PASS_TYPE_ID = "pass.com.puffincruises.boarding";
@@ -590,6 +592,86 @@ async function handleWebhook(request: Request, env: Env): Promise<Response> {
   return new Response(null, { status: 200 });
 }
 
+// ── Push Notifications via OneSignal ──────────────────────────
+
+type NotifyBody = {
+  heading: string;
+  message: string;
+  target: "all" | "boarded";
+};
+
+async function handleNotify(request: Request, env: Env): Promise<Response> {
+  const apiKey = env.ONESIGNAL_REST_API_KEY?.trim();
+  const appId = env.ONESIGNAL_APP_ID?.trim() ?? env.ONESIGNAL_REST_API_KEY ? "" : "";
+
+  if (!apiKey) {
+    return json({ error: "onesignal_not_configured", message: "ONESIGNAL_REST_API_KEY is not set in the backend environment." }, { status: 503 });
+  }
+
+  const body = (await request.json()) as NotifyBody;
+  if (!body.message?.trim()) return json({ error: "missing_message" }, { status: 400 });
+
+  const heading = body.heading?.trim() || "Puffin Cruises";
+  const message = body.message.trim();
+  const target = body.target === "boarded" ? "boarded" : "all";
+
+  // Fetch target emails from Supabase
+  let filter = "in.(paid,boarded)";
+  if (target === "boarded") filter = "eq.boarded";
+
+  const emailsRes = await supa(
+    env,
+    `/bookings?status=${encodeURIComponent(filter)}&select=customer_email&limit=500`,
+    { method: "GET" },
+  );
+
+  if (!emailsRes.ok) {
+    console.error("[notify] supabase fetch failed", emailsRes.status);
+    return json({ error: "fetch_failed" }, { status: 500 });
+  }
+
+  const rows = (await emailsRes.json()) as { customer_email: string }[];
+  const emails = [...new Set(rows.map((r) => r.customer_email?.toLowerCase().trim()).filter(Boolean))];
+
+  if (emails.length === 0) {
+    return json({ sent: 0, message: "No customers found to notify." });
+  }
+
+  // Call OneSignal REST API to send push notification
+  try {
+    const onesignalRes = await fetch("https://onesignal.com/api/v1/notifications", {
+      method: "POST",
+      headers: {
+        Authorization: `Basic ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        app_id: appId || undefined,
+        headings: { en: heading },
+        contents: { en: message },
+        include_external_user_ids: emails,
+        channel_for_external_user_ids: "push",
+      }),
+    });
+
+    const onesignalBody = (await onesignalRes.json()) as { id?: string; errors?: unknown };
+
+    if (!onesignalRes.ok) {
+      console.error("[notify] oneSignal error", onesignalRes.status, onesignalBody);
+      return json(
+        { error: "oneSignal_error", detail: onesignalBody },
+        { status: 502 },
+      );
+    }
+
+    console.log("[notify] sent", onesignalBody.id ?? "ok", `to ${emails.length} recipients`);
+    return json({ sent: emails.length, oneSignalId: onesignalBody.id ?? null });
+  } catch (err) {
+    console.error("[notify] oneSignal fetch failed", err);
+    return json({ error: "oneSignal_unreachable" }, { status: 502 });
+  }
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
@@ -621,6 +703,15 @@ export default {
       } catch (err) {
         console.error("wallet pass error", err);
         return json({ error: "wallet_pass_error" }, { status: 500 });
+      }
+    }
+
+    if (url.pathname === "/notify" && request.method === "POST") {
+      try {
+        return await handleNotify(request, env);
+      } catch (err) {
+        console.error("notify error", err);
+        return json({ error: "notify_error" }, { status: 500 });
       }
     }
 

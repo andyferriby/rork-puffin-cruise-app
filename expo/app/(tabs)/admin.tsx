@@ -547,6 +547,9 @@ function AdminEditor({
           </View>
         </Section>
 
+        {/* Push Notifications */}
+        <NotifySection />
+
         {/* On Board List */}
         <Section title="Currently On Board">
           <View style={styles.onboardCard}>
@@ -995,6 +998,99 @@ function AdminEditor({
         </Pressable>
       </View>
     </KeyboardAvoidingView>
+  );
+}
+
+// ── Push Notification Sender ─────────────────────────────────────
+
+function NotifySection() {
+  const [notifyMessage, setNotifyMessage] = useState<string>("");
+  const [notifyTarget, setNotifyTarget] = useState<"all" | "boarded">("all");
+  const [sending, setSending] = useState<boolean>(false);
+  const [sent, setSent] = useState<boolean>(false);
+
+  const handleSendNotification = useCallback(async () => {
+    if (!notifyMessage.trim()) return;
+    setSending(true);
+    try {
+      const res = await fetch(`${BASE}/notify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          heading: "Puffin Cruises",
+          message: notifyMessage.trim(),
+          target: notifyTarget,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json() as { error?: string };
+        throw new Error(err.error ?? `HTTP ${res.status}`);
+      }
+      setSent(true);
+      setNotifyMessage("");
+      if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setTimeout(() => setSent(false), 3000);
+    } catch (err) {
+      console.error("[admin] notify send", err);
+      Alert.alert("Send failed", err instanceof Error ? err.message : "Could not send notifications. Check your connection and try again.");
+    } finally {
+      setSending(false);
+    }
+  }, [notifyMessage, notifyTarget]);
+
+  return (
+    <Section title="Notify Customers">
+      <View style={styles.notifyCard}>
+        <Text style={styles.notifyLabel}>Push notification message</Text>
+        <TextInput
+          value={notifyMessage}
+          onChangeText={setNotifyMessage}
+          placeholder="e.g. Sailing times updated — check the app!"
+          placeholderTextColor={theme.textMuted}
+          multiline
+          style={[styles.field, { minHeight: 80 }]}
+        />
+
+        <Text style={styles.notifyLabel}>Send to</Text>
+        <View style={styles.notifyTargetRow}>
+          <Pressable
+            onPress={() => setNotifyTarget("all")}
+            style={[styles.notifyTargetBtn, notifyTarget === "all" && styles.notifyTargetBtnActive]}
+          >
+            <Users size={14} color={notifyTarget === "all" ? theme.white : theme.textMuted} />
+            <Text style={[styles.notifyTargetText, notifyTarget === "all" && styles.notifyTargetTextActive]}>All customers</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => setNotifyTarget("boarded")}
+            style={[styles.notifyTargetBtn, notifyTarget === "boarded" && styles.notifyTargetBtnActive]}
+          >
+            <Anchor size={14} color={notifyTarget === "boarded" ? theme.white : theme.textMuted} />
+            <Text style={[styles.notifyTargetText, notifyTarget === "boarded" && styles.notifyTargetTextActive]}>Boarded only</Text>
+          </Pressable>
+        </View>
+
+        <Pressable
+          onPress={handleSendNotification}
+          disabled={!notifyMessage.trim() || sending}
+          style={({ pressed }) => [
+            styles.notifySendBtn,
+            (!notifyMessage.trim() || sending) && { opacity: 0.5 },
+            pressed && { opacity: 0.85 },
+          ]}
+        >
+          {sending ? (
+            <ActivityIndicator color={theme.white} size="small" />
+          ) : sent ? (
+            <CheckCircle size={18} color={theme.white} />
+          ) : (
+            <Bell size={18} color={theme.white} />
+          )}
+          <Text style={styles.notifySendBtnText}>
+            {sending ? "Sending…" : sent ? "Sent!" : "Send Push Notification"}
+          </Text>
+        </Pressable>
+      </View>
+    </Section>
   );
 }
 
@@ -1559,5 +1655,64 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "900",
     color: theme.text,
+  },
+
+  // Notify
+  notifyCard: {
+    backgroundColor: theme.white,
+    borderWidth: 1,
+    borderColor: theme.border,
+    borderRadius: 18,
+    padding: 14,
+    gap: 12,
+  },
+  notifyLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: theme.textMuted,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  notifyTargetRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  notifyTargetBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: theme.border,
+    backgroundColor: theme.bg,
+  },
+  notifyTargetBtnActive: {
+    borderColor: theme.sea,
+    backgroundColor: theme.sea,
+  },
+  notifyTargetText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: theme.textMuted,
+  },
+  notifyTargetTextActive: {
+    color: theme.white,
+  },
+  notifySendBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 14,
+    backgroundColor: theme.puffin,
+  },
+  notifySendBtnText: {
+    color: theme.white,
+    fontSize: 15,
+    fontWeight: "800",
   },
 });

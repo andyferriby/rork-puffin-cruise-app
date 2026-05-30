@@ -6,8 +6,7 @@
 - [x] **Schedule & Sailings** — Date-picker with day-by-day sailing time cards, capacity bars, weather notes
 - [x] **Ratings & Reviews** — Star ratings (1–5) and comments on cruise cards and ticket detail after a cruise
 - [x] **Apple Wallet Passes** — One-tap "Add to Wallet" for boarding passes with QR codes
-- [ ] **Push Notification History** — REMOVED: not functional, consuming credits
-- [ ] **Push Trip Reminders** — REMOVED: not functional, consuming credits
+- [x] **OneSignal Push Notifications** — Admin can send push alerts to all customers or boarded passengers via OneSignal; customers toggle on/off in Profile
 - [x] **QR Boarding Passes** — Generated QR codes on ticket detail, plus admin QR scanner for check-in
 - [x] **Guest Photo Gallery** — Upload from camera or library, view community photos on the home screen
 - [x] **Interactive Map** — Amble Harbour, Coquet Island route, parking, dining, landmarks, category filters, and live boat position

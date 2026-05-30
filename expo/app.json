@@ -18,11 +18,12 @@
       "bundleIdentifier": "app.rork.gpczuon7nhtm91bqwzkc7",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Crew can share the boat position during a sailing so customers can see live progress on the map.",
-        "NSCameraUsageDescription": "Scan QR codes on boarding passes to check in passengers."
+        "NSCameraUsageDescription": "Scan QR codes on boarding passes to check in passengers.",
+        "UIBackgroundModes": ["remote-notification"]
       }
     },
     "android": {
-      "permissions": ["ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION"],
+      "permissions": ["ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION", "POST_NOTIFICATIONS", "RECEIVE_BOOT_COMPLETED", "VIBRATE"],
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
@@ -33,6 +34,12 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
+      [
+        "onesignal-expo-plugin",
+        {
+          "mode": "production"
+        }
+      ],
       [
         "expo-router",
         {

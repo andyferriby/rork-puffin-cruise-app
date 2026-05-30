@@ -2,12 +2,13 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useQuery } from "@tanstack/react-query";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import { Gift, MapPinned, Share2, Star, Trophy } from "lucide-react-native";
-import React, { useEffect, useMemo, useState } from "react";
+import { Bell, BellOff, Gift, MapPinned, Share2, Star, Trophy } from "lucide-react-native";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, Linking, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { theme } from "@/constants/theme";
 import { supabase } from "@/lib/supabase";
+import { isNotificationsEnabled, linkEmailToPush, setNotificationsEnabled } from "@/lib/notifications";
 
 type Booking = { id: string; cruise_date: string; cruise_name: string; customer_email: string; status: string };
 type Tier = { name: string; emoji: string; minTrips: number; colors: readonly [string, string]; benefits: string[] };
@@ -33,9 +34,22 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const [email, setEmail] = useState<string>("");
   const [referralCode, setReferralCode] = useState<string>("");
+  const [notifEnabled, setNotifEnabled] = useState<boolean>(false);
+  const [notifLoading, setNotifLoading] = useState<boolean>(false);
   const { data = [], refetch, isFetching } = useQuery({ queryKey: ["profile-bookings", email], queryFn: () => fetchBookings(email), enabled: false });
 
-  useEffect(() => { AsyncStorage.getItem(REFERRAL_KEY).then(async (saved) => { const code = saved ?? makeCode(); setReferralCode(code); if (!saved) await AsyncStorage.setItem(REFERRAL_KEY, code); }); }, []);
+  useEffect(() => {
+    AsyncStorage.getItem(REFERRAL_KEY).then(async (saved) => { const code = saved ?? makeCode(); setReferralCode(code); if (!saved) await AsyncStorage.setItem(REFERRAL_KEY, code); });
+    isNotificationsEnabled().then(setNotifEnabled);
+  }, []);
+
+  const handleToggleNotifications = useCallback(async () => {
+    setNotifLoading(true);
+    const newValue = !notifEnabled;
+    await setNotificationsEnabled(newValue, email || undefined);
+    setNotifEnabled(newValue);
+    setNotifLoading(false);
+  }, [notifEnabled, email]);
 
   const completedTrips = data.filter((b) => b.status === "paid" || new Date(b.cruise_date) < new Date()).length;
   const tier = useMemo<Tier>(() => [...tiers].reverse().find((t) => completedTrips >= t.minTrips) ?? tiers[0], [completedTrips]);
@@ -51,6 +65,7 @@ export default function ProfileScreen() {
     <LinearGradient colors={tier.colors} style={styles.loyalty}><View style={styles.loyaltyHead}><Text style={styles.tierEmoji}>{tier.emoji}</Text><View><Text style={styles.tierTitle}>Puffin Club · {tier.name}</Text><Text style={styles.tierMeta}>{completedTrips} trips · {completedTrips * 100} points</Text></View></View><View style={styles.progressTrack}><View style={[styles.progressFill, { width: `${Math.max(8, progress * 100)}%` }]}/></View><Text style={styles.nextText}>{next ? `${next.minTrips - completedTrips} more trip${next.minTrips - completedTrips === 1 ? "" : "s"} to ${next.name}` : "Top tier unlocked"}</Text></LinearGradient>
     <View style={styles.card}><View style={styles.cardHead}><Star size={17} color={theme.puffin}/><Text style={styles.cardTitle}>Your Benefits</Text></View>{tier.benefits.map((b) => <View key={b} style={styles.benefit}><Text style={styles.check}>✓</Text><Text style={styles.benefitText}>{b}</Text></View>)}</View>
     <View style={styles.actions}><Pressable onPress={shareReferral} style={styles.action}><Share2 size={22} color={theme.sea}/><Text style={styles.actionTitle}>Refer a friend</Text><Text style={styles.actionSub}>{referralCode || "Loading code…"}</Text></Pressable><Pressable onPress={() => router.push("/arrival-guide")} style={styles.action}><MapPinned size={22} color={theme.sea}/><Text style={styles.actionTitle}>Arrival guide</Text><Text style={styles.actionSub}>Parking, check-in, what to bring</Text></Pressable></View>
+    <View style={styles.card}><View style={styles.cardHead}>{notifEnabled ? <Bell size={17} color={theme.puffin} /> : <BellOff size={17} color={theme.textMuted} />}<Text style={styles.cardTitle}>Notifications</Text></View><Text style={styles.empty}>Get trip reminders, boarding alerts, and schedule updates.</Text><Pressable onPress={handleToggleNotifications} disabled={notifLoading} style={[styles.notifToggle, notifEnabled && styles.notifToggleOn]}><View style={[styles.notifKnob, notifEnabled && styles.notifKnobOn]} /><Text style={[styles.notifLabel, notifEnabled && styles.notifLabelOn]}>{notifLoading ? "Updating…" : notifEnabled ? "Enabled" : "Disabled — tap to enable"}</Text></Pressable></View>
     <View style={styles.card}><View style={styles.cardHead}><Trophy size={17} color={theme.puffin}/><Text style={styles.cardTitle}>Trip History</Text></View>{data.length === 0 ? <Text style={styles.empty}>Load your email to see past and upcoming cruises.</Text> : data.slice(0, 6).map((b) => <View key={b.id} style={styles.trip}><Gift size={16} color={theme.sea}/><View><Text style={styles.tripTitle}>{b.cruise_name}</Text><Text style={styles.tripDate}>{new Date(b.cruise_date).toLocaleDateString("en-GB")}</Text></View></View>)}</View>
   </ScrollView></View>;
 }
