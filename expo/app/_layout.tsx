@@ -5,9 +5,8 @@ import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import React, { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { OneSignal } from "react-native-onesignal";
 import { ONBOARDING_KEY } from "@/app/onboarding";
-import { initOneSignal } from "@/lib/notifications";
+import { initOneSignal, onNotificationTap } from "@/lib/notifications";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -52,7 +51,7 @@ export default function RootLayout() {
 
   // Handle notification taps — navigate to tickets tab
   useEffect(() => {
-    OneSignal.Notifications.addEventListener("click", () => {
+    onNotificationTap(() => {
       router.replace("/(tabs)/tickets");
     });
   }, []);
