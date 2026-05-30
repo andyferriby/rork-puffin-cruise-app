@@ -1,38 +1,20 @@
-# Puffin Cruises — Full Feature Set
+# Add Coquet Island live cameras and WooCommerce shop
+
 
 ## Features
 
-- [x] **Cruise Booking** — 5-step checkout flow (cruise → date → time → passengers → contact → Stripe payment)
-- [x] **Schedule & Sailings** — Date-picker with day-by-day sailing time cards, capacity bars, weather notes
-- [x] **Ratings & Reviews** — Star ratings (1–5) and comments on cruise cards and ticket detail after a cruise
-- [x] **Apple Wallet Passes** — One-tap "Add to Wallet" for boarding passes with QR codes
-- [x] **OneSignal Push Notifications** — Admin can send push alerts to all customers or boarded passengers via OneSignal; customers toggle on/off in Profile
-- [x] **QR Boarding Passes** — Generated QR codes on ticket detail, plus admin QR scanner for check-in
-- [x] **Guest Photo Gallery** — Upload from camera or library, view community photos on the home screen
-- [x] **Interactive Map** — Amble Harbour, Coquet Island route, parking, dining, landmarks, category filters, and live boat position
-- [x] **Wildlife Guide** — Puffins, seals, terns, and more with descriptions, season info, and fun facts
-- [x] **Admin Panel** — PIN-gated schedule/price editor, QR ticket scanner
-- [x] **First-Time Onboarding** — Swipe-through welcome cards introducing the app, wildlife, tickets, and live boat tracking on first launch
-- [x] **Loyalty Program (Puffin Club)** — Tiered rewards (Bronze → Silver → Gold → Platinum) based on trips taken, with progress bar and tier benefits
-- [x] **Refer a Friend** — Unique referral codes, share sheet, £5 credit for both referrer and referred
-- [x] **Arrival Guide** — Comprehensive pre-cruise info: parking, what to bring, check-in, accessibility, weather policies, contact details
-- [x] **Crew Phone Boat Tracker** — Admin controls for start/stop tracking, manual pings, and live customer map marker
-- [x] **Live Trip Mode** — On-the-day hub with check-in info, weather, sea conditions, wildlife spotting, photo memories, and kids activity trail
+- [x] **Live Cameras tab** — dedicated screen with 4 embedded YouTube live streams showing Coquet Island cameras. Crew can update the video links daily from the admin panel without needing a new build. Thumbnail placeholders show while streams load, and each stream has a short label (e.g. "Puffin Colony", "North Cliffs").
+
+- [x] **Shop tab** — pulls real products from your WooCommerce store (prices, images, descriptions, stock status) and displays them in a clean product grid. Tapping a product shows full details. Tapping "Buy" opens the WooCommerce website to complete checkout with your existing Stripe payment flow — no additional payment integration needed.
+
+- [x] **Admin panel additions** — two new sections below the existing schedule editor: one for updating the 4 YouTube video IDs (saved to Supabase so they update instantly), and one for entering your WooCommerce store URL and consumer keys so the shop tab pulls live product data.
 
 ## Design
 
-Nautical theme throughout — deep navy blues, sea blue, coral and puffin orange accents, sand tones. Rounded typography. Cards with soft shadows. Gradient hero sections. Wave decorations.
+Both screens follow the existing nautical theme — deep navy backgrounds, sea-blue accents, rounded card layouts. The live cameras screen shows a stacked grid of video players with puffin-orange accent borders. The shop screen uses a two-column product grid with soft-shadow product cards, price badges in sea-blue, and smooth loading skeletons.
 
 ## Screens
 
-- [x] Home — hero, today's sailings, cruise cards with ratings, guest photos, book/call CTAs
-- [x] Sailings — date picker with day-by-day sailing time cards
-- [x] Book — 5-step checkout with Stripe payments
-- [x] Map — harbour map with route, parking, landmarks, category filters, nearby dining, and live boat marker
-- [x] Wildlife — puffin, seal & bird guide for Coquet Island
-- [x] Trip — live trip mode with sea outlook, wildlife sighting log, photo memories, and kids trail
-- [x] Tickets — QR boarding passes, Apple Wallet, email lookup, ratings & reviews
-- [x] Profile — loyalty tier card, benefits, refer a friend, arrival guide link, past bookings
-- [x] Admin — PIN-locked schedule/price editor, QR scanner, crew boat tracker
-- [x] Onboarding — first-launch swipe-through with 6 welcome slides including live boat tracking
-- [x] Arrival Guide — parking, what to bring, check-in, accessibility, weather, contact
+- [x] **Live Cameras** — new tab showing 4 YouTube live streams stacked vertically, each with a label and loading placeholder
+- [x] **Shop** — new tab with product grid, product detail view, and a link-out to your WooCommerce store for checkout
+- [x] **Admin (updated)** — adds YouTube link manager and WooCommerce config sections

@@ -20,9 +20,11 @@ import {
   Radio,
   Save,
   ShipWheel,
+  ShoppingBag,
   Ticket,
   Trash2,
   Users,
+  Video,
   X,
 } from "lucide-react-native";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -40,7 +42,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { theme } from "@/constants/theme";
+import { spacing, theme } from "@/constants/theme";
 import { fetchSchedule, type Cruise, type DaySchedule, type ScheduleConfig } from "@/lib/schedule";
 import { fetchBoatLocation, saveBoatLocation, stopBoatTracking, type BoatLocation } from "@/lib/boatTracker";
 import { supabase } from "@/lib/supabase";
@@ -975,6 +977,9 @@ function AdminEditor({
             <Text style={styles.addDayBtnText}>Add day</Text>
           </Pressable>
         </Section>
+
+        <CamerasSection />
+        <WooSection />
       </ScrollView>
 
       {/* Sticky footer */}
@@ -998,6 +1003,266 @@ function AdminEditor({
         </Pressable>
       </View>
     </KeyboardAvoidingView>
+  );
+}
+
+// ── YouTube Cameras Manager ───────────────────────────────────
+
+function CamerasSection() {
+  const [videoIds, setVideoIds] = useState<string[]>(["", "", "", ""]);
+  const [labels, setLabels] = useState<string[]>(["Puffin Colony", "North Cliffs", "East Shore", "Harbour View"]);
+  const [saving, setSaving] = useState<boolean>(false);
+  const [loaded, setLoaded] = useState<boolean>(false);
+  const [saved, setSaved] = useState<boolean>(false);
+
+  useEffect(() => {
+    supabase
+      .from("app_config")
+      .select("value")
+      .eq("key", "cameras")
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data?.value) {
+          const val = data.value as Record<string, unknown>;
+          if (Array.isArray(val.videos)) {
+            const videos = val.videos as { id: string; label: string }[];
+            setVideoIds(videos.map((v) => v.id ?? ""));
+            setLabels(videos.map((v) => v.label ?? ""));
+          }
+        }
+        setLoaded(true);
+      });
+  }, []);
+
+  const handleSave = useCallback(async () => {
+    setSaving(true);
+    try {
+      const videos = videoIds.map((id, i) => ({
+        id: id.trim(),
+        label: labels[i]?.trim() || `Camera ${i + 1}`,
+      }));
+      const { error } = await supabase
+        .from("app_config")
+        .upsert(
+          { key: "cameras", value: { videos } as unknown as Record<string, unknown>, updated_at: new Date().toISOString() },
+          { onConflict: "key" },
+        );
+      if (error) throw error;
+      setSaved(true);
+      if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setTimeout(() => setSaved(false), 3000);
+    } catch (err) {
+      console.error("[admin] cameras save", err);
+      Alert.alert("Save failed", err instanceof Error ? err.message : "Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  }, [videoIds, labels]);
+
+  if (!loaded) {
+    return (
+      <Section title="Live Cameras">
+        <View style={styles.notifyCard}>
+          <ActivityIndicator color={theme.sea} />
+        </View>
+      </Section>
+    );
+  }
+
+  return (
+    <Section title="Live Cameras">
+      <View style={styles.notifyCard}>
+        <Text style={styles.notifyLabel}>
+          Enter YouTube video IDs for the 4 Coquet Island live camera streams. Links change every 24 hours — update here daily.
+        </Text>
+
+        {videoIds.map((vid, i) => (
+          <View key={i} style={{ gap: 4, marginTop: i === 0 ? 0 : 10 }}>
+            <Text style={styles.hintLabel}>Camera {i + 1} Label</Text>
+            <TextInput
+              value={labels[i] ?? ""}
+              onChangeText={(v) => {
+                const next = [...labels];
+                next[i] = v;
+                setLabels(next);
+              }}
+              placeholder="e.g. Puffin Colony"
+              placeholderTextColor={theme.textMuted}
+              style={styles.field}
+            />
+            <Text style={[styles.hintLabel, { marginTop: 4 }]}>YouTube Video ID</Text>
+            <TextInput
+              value={vid}
+              onChangeText={(v) => {
+                const next = [...videoIds];
+                next[i] = v;
+                setVideoIds(next);
+              }}
+              placeholder="e.g. dQw4w9WgXcQ"
+              placeholderTextColor={theme.textMuted}
+              autoCapitalize="none"
+              autoCorrect={false}
+              style={styles.field}
+            />
+          </View>
+        ))}
+
+        <Pressable
+          onPress={handleSave}
+          disabled={saving}
+          style={({ pressed }) => [
+            styles.notifySendBtn,
+            saving && { opacity: 0.5 },
+            pressed && { opacity: 0.85 },
+            { marginTop: spacing.md },
+          ]}
+        >
+          {saving ? (
+            <ActivityIndicator color={theme.white} size="small" />
+          ) : saved ? (
+            <CheckCircle size={18} color={theme.white} />
+          ) : (
+            <Video size={18} color={theme.white} />
+          )}
+          <Text style={styles.notifySendBtnText}>
+            {saving ? "Saving…" : saved ? "Saved!" : "Save Camera Links"}
+          </Text>
+        </Pressable>
+      </View>
+    </Section>
+  );
+}
+
+// ── WooCommerce Config ─────────────────────────────────────────
+
+function WooSection() {
+  const [storeUrl, setStoreUrl] = useState<string>("");
+  const [consumerKey, setConsumerKey] = useState<string>("");
+  const [consumerSecret, setConsumerSecret] = useState<string>("");
+  const [saving, setSaving] = useState<boolean>(false);
+  const [loaded, setLoaded] = useState<boolean>(false);
+  const [saved, setSaved] = useState<boolean>(false);
+
+  useEffect(() => {
+    supabase
+      .from("app_config")
+      .select("value")
+      .eq("key", "woocommerce")
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data?.value) {
+          const val = data.value as Record<string, unknown>;
+          setStoreUrl(typeof val.storeUrl === "string" ? val.storeUrl : "");
+          setConsumerKey(typeof val.consumerKey === "string" ? val.consumerKey : "");
+          setConsumerSecret(typeof val.consumerSecret === "string" ? val.consumerSecret : "");
+        }
+        setLoaded(true);
+      });
+  }, []);
+
+  const handleSave = useCallback(async () => {
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from("app_config")
+        .upsert(
+          {
+            key: "woocommerce",
+            value: {
+              storeUrl: storeUrl.trim(),
+              consumerKey: consumerKey.trim(),
+              consumerSecret: consumerSecret.trim(),
+            } as unknown as Record<string, unknown>,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "key" },
+        );
+      if (error) throw error;
+      setSaved(true);
+      if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setTimeout(() => setSaved(false), 3000);
+    } catch (err) {
+      console.error("[admin] woocommerce save", err);
+      Alert.alert("Save failed", err instanceof Error ? err.message : "Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  }, [storeUrl, consumerKey, consumerSecret]);
+
+  if (!loaded) {
+    return (
+      <Section title="WooCommerce Shop">
+        <View style={styles.notifyCard}>
+          <ActivityIndicator color={theme.sea} />
+        </View>
+      </Section>
+    );
+  }
+
+  return (
+    <Section title="WooCommerce Shop">
+      <View style={styles.notifyCard}>
+        <Text style={styles.notifyLabel}>
+          Connect your WooCommerce store to show products in the Shop tab. Find your consumer keys in WooCommerce → Settings → Advanced → REST API.
+        </Text>
+
+        <Text style={styles.hintLabel}>Store URL</Text>
+        <TextInput
+          value={storeUrl}
+          onChangeText={setStoreUrl}
+          placeholder="https://puffincruises.com"
+          placeholderTextColor={theme.textMuted}
+          autoCapitalize="none"
+          autoCorrect={false}
+          keyboardType="url"
+          style={styles.field}
+        />
+
+        <Text style={styles.hintLabel}>Consumer Key</Text>
+        <TextInput
+          value={consumerKey}
+          onChangeText={setConsumerKey}
+          placeholder="ck_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+          placeholderTextColor={theme.textMuted}
+          autoCapitalize="none"
+          autoCorrect={false}
+          style={styles.field}
+        />
+
+        <Text style={styles.hintLabel}>Consumer Secret</Text>
+        <TextInput
+          value={consumerSecret}
+          onChangeText={setConsumerSecret}
+          placeholder="cs_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+          placeholderTextColor={theme.textMuted}
+          autoCapitalize="none"
+          autoCorrect={false}
+          style={styles.field}
+        />
+
+        <Pressable
+          onPress={handleSave}
+          disabled={saving}
+          style={({ pressed }) => [
+            styles.notifySendBtn,
+            saving && { opacity: 0.5 },
+            pressed && { opacity: 0.85 },
+            { marginTop: spacing.md },
+          ]}
+        >
+          {saving ? (
+            <ActivityIndicator color={theme.white} size="small" />
+          ) : saved ? (
+            <CheckCircle size={18} color={theme.white} />
+          ) : (
+            <ShoppingBag size={18} color={theme.white} />
+          )}
+          <Text style={styles.notifySendBtnText}>
+            {saving ? "Saving…" : saved ? "Saved!" : "Save Shop Config"}
+          </Text>
+        </Pressable>
+      </View>
+    </Section>
   );
 }
 

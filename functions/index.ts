@@ -601,6 +601,47 @@ type NotifyBody = {
   appId: string;
 };
 
+// ── WooCommerce Proxy ────────────────────────────────────────
+
+type WooProductsBody = {
+  storeUrl: string;
+  consumerKey: string;
+  consumerSecret: string;
+};
+
+async function handleWooProducts(request: Request, _env: Env): Promise<Response> {
+  const body = (await request.json()) as WooProductsBody;
+  const storeUrl = body.storeUrl?.trim();
+  const consumerKey = body.consumerKey?.trim();
+  const consumerSecret = body.consumerSecret?.trim();
+
+  if (!storeUrl || !consumerKey || !consumerSecret) {
+    return json({ error: "missing_woocommerce_config" }, { status: 400 });
+  }
+
+  const baseUrl = storeUrl.replace(/\/+$/, "");
+  const apiUrl = `${baseUrl}/wp-json/wc/v3/products?per_page=50&status=publish`;
+
+  try {
+    const auth = Buffer.from(`${consumerKey}:${consumerSecret}`).toString("base64");
+    const res = await fetch(apiUrl, {
+      headers: {
+        Authorization: `Basic ${auth}`,
+        "Content-Type": "application/json",
+      },
+    });
+    const data = (await res.json()) as unknown;
+    if (!res.ok) {
+      console.error("[woocommerce] upstream error", res.status, JSON.stringify(data).slice(0, 300));
+      return json({ error: "woocommerce_upstream_error", status: res.status, detail: data }, { status: 502 });
+    }
+    return json({ products: data });
+  } catch (err) {
+    console.error("[woocommerce] fetch error", err);
+    return json({ error: "woocommerce_unreachable" }, { status: 502 });
+  }
+}
+
 async function handleNotify(request: Request, env: Env): Promise<Response> {
   const apiKey = env.ONESIGNAL_REST_API_KEY?.trim();
 
@@ -714,6 +755,15 @@ export default {
       } catch (err) {
         console.error("notify error", err);
         return json({ error: "notify_error" }, { status: 500 });
+      }
+    }
+
+    if (url.pathname === "/woocommerce/products" && request.method === "POST") {
+      try {
+        return await handleWooProducts(request, env);
+      } catch (err) {
+        console.error("woocommerce error", err);
+        return json({ error: "woocommerce_error" }, { status: 500 });
       }
     }
 

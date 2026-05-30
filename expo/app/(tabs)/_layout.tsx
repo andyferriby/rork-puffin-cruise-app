@@ -1,5 +1,5 @@
 import { Tabs } from "expo-router";
-import { Anchor, CalendarDays, Compass, Map, PawPrint, Settings, Ticket, User } from "lucide-react-native";
+import { Anchor, CalendarDays, Compass, Map, PawPrint, Settings, ShoppingBag, Ticket, User, Video } from "lucide-react-native";
 import React from "react";
 import { Platform } from "react-native";
 
@@ -79,6 +79,20 @@ export default function TabLayout() {
         options={{
           title: "Profile",
           tabBarIcon: ({ color, size }) => <User color={color} size={size} />,
+        }}
+      />
+      <Tabs.Screen
+        name="cameras"
+        options={{
+          title: "Cameras",
+          tabBarIcon: ({ color, size }) => <Video color={color} size={size} />,
+        }}
+      />
+      <Tabs.Screen
+        name="shop"
+        options={{
+          title: "Shop",
+          tabBarIcon: ({ color, size }) => <ShoppingBag color={color} size={size} />,
         }}
       />
       <Tabs.Screen
