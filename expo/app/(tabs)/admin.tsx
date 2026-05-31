@@ -477,6 +477,38 @@ function AdminEditor({
     }
   }, [boatLocation, qc]);
 
+  const [resettingBoarded, setResettingBoarded] = useState<boolean>(false);
+  const handleResetBoarded = useCallback(() => {
+    Alert.alert(
+      "Reset On Board",
+      `This will clear all ${boardedBookings.length} boarded passengers (${boardedTotals.adults + boardedTotals.children} people) back to "paid" status for the next trip. This cannot be undone.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Reset All",
+          style: "destructive",
+          onPress: async () => {
+            setResettingBoarded(true);
+            try {
+              const { error } = await supabase
+                .from("bookings")
+                .update({ status: "paid" })
+                .eq("status", "boarded");
+              if (error) throw error;
+              refetchBoarded();
+              if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            } catch (err) {
+              console.error("[admin] reset boarded", err);
+              Alert.alert("Reset failed", err instanceof Error ? err.message : "Please try again.");
+            } finally {
+              setResettingBoarded(false);
+            }
+          },
+        },
+      ],
+    );
+  }, [boardedBookings, boardedTotals, refetchBoarded]);
+
   useEffect(() => {
     if (!isTrackingBoat) return;
     void publishCurrentBoatLocation();
@@ -618,6 +650,26 @@ function AdminEditor({
                       </Text>
                     </View>
                   </View>
+
+                  {/* Reset for next trip */}
+                  <Pressable
+                    onPress={handleResetBoarded}
+                    disabled={resettingBoarded}
+                    style={({ pressed }) => [
+                      styles.resetBtn,
+                      resettingBoarded && { opacity: 0.5 },
+                      pressed && { opacity: 0.85 },
+                    ]}
+                  >
+                    {resettingBoarded ? (
+                      <ActivityIndicator color={theme.coral} size="small" />
+                    ) : (
+                      <Trash2 size={16} color={theme.coral} />
+                    )}
+                    <Text style={styles.resetBtnText}>
+                      {resettingBoarded ? "Resetting…" : "Reset for Next Trip"}
+                    </Text>
+                  </Pressable>
                 </View>
               </>
             )}
@@ -1979,6 +2031,25 @@ const styles = StyleSheet.create({
   notifySendBtnText: {
     color: theme.white,
     fontSize: 15,
+    fontWeight: "800",
+  },
+
+  // Reset boarded
+  resetBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: theme.coral,
+    backgroundColor: "#FFF3F0",
+    marginTop: 4,
+  },
+  resetBtnText: {
+    color: theme.coral,
+    fontSize: 14,
     fontWeight: "800",
   },
 });
