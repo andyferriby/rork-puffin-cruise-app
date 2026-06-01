@@ -1,4 +1,4 @@
-// Puffin Cruises backend: Stripe checkout + webhook + Supabase persistence.
+// Puffin Cruises backend: Stripe checkout, webhook, notifications + Supabase persistence.
 
 import { createOpenSslCompatiblePkcs7Signature } from "@swapnanildhol/passkit-pkcs7-signature";
 import { Buffer } from "node:buffer";
@@ -22,6 +22,7 @@ type Env = {
   RESEND_FROM_EMAIL?: string;
   ONESIGNAL_REST_API_KEY?: string;
   ONESIGNAL_APP_ID?: string;
+  EXPO_PUBLIC_ONESIGNAL_APP_ID?: string;
 };
 
 const APPLE_PASS_TYPE_ID = "pass.com.puffincruises.boarding";
@@ -560,6 +561,7 @@ async function handleWebhook(request: Request, env: Env): Promise<Response> {
         const bookings = (await bookingRes.json()) as { id: string; customer_email: string; customer_name: string; cruise_name: string; cruise_date: string; cruise_time: string; adults: number; children: number }[];
         if (bookings[0]) {
           await sendBookingConfirmationEmail(env, bookings[0]);
+          await sendAdminBookingAlert(env, bookings[0]);
         }
       }
     }
@@ -601,6 +603,16 @@ type NotifyBody = {
   appId: string;
 };
 
+type AdminBookingAlert = {
+  id: string;
+  customer_name: string;
+  cruise_name: string;
+  cruise_date: string;
+  cruise_time: string;
+  adults: number;
+  children: number;
+};
+
 // ── WooCommerce Proxy ────────────────────────────────────────
 
 type WooProductsBody = {
@@ -640,6 +652,58 @@ async function handleWooProducts(request: Request, _env: Env): Promise<Response>
     console.error("[woocommerce] fetch error", err);
     return json({ error: "woocommerce_unreachable" }, { status: 502 });
   }
+}
+
+async function sendOneSignalNotification(env: Env, payload: Record<string, unknown>): Promise<{ ok: boolean; id?: string; status?: number; detail?: unknown }> {
+  const apiKey = env.ONESIGNAL_REST_API_KEY?.trim();
+  const appId = env.ONESIGNAL_APP_ID?.trim() || env.EXPO_PUBLIC_ONESIGNAL_APP_ID?.trim();
+
+  if (!apiKey || !appId) return { ok: false, detail: "onesignal_not_configured" };
+
+  try {
+    const onesignalRes = await fetch("https://onesignal.com/api/v1/notifications", {
+      method: "POST",
+      headers: {
+        Authorization: `Basic ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ app_id: appId, ...payload }),
+    });
+
+    const onesignalBody = (await onesignalRes.json()) as { id?: string; errors?: unknown };
+    if (!onesignalRes.ok) {
+      return { ok: false, status: onesignalRes.status, detail: onesignalBody };
+    }
+
+    return { ok: true, id: onesignalBody.id };
+  } catch (err) {
+    return { ok: false, detail: err instanceof Error ? err.message : "onesignal_unreachable" };
+  }
+}
+
+async function sendAdminBookingAlert(env: Env, booking: AdminBookingAlert): Promise<void> {
+  const totalPassengers = booking.adults + booking.children;
+  const dateText = new Date(`${booking.cruise_date}T00:00:00`).toLocaleDateString("en-GB", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  });
+
+  const result = await sendOneSignalNotification(env, {
+    headings: { en: "New booking received" },
+    contents: {
+      en: `${booking.customer_name} booked ${totalPassengers} place${totalPassengers === 1 ? "" : "s"} for ${booking.cruise_name} · ${dateText} ${booking.cruise_time}`,
+    },
+    filters: [{ field: "tag", key: "admin_alerts", relation: "=", value: "true" }],
+    data: { type: "admin_booking", bookingId: booking.id },
+  });
+
+  if (!result.ok) {
+    console.error("[notify] admin booking alert failed", result.status ?? "no-status", result.detail);
+    return;
+  }
+
+  console.log("[notify] admin booking alert sent", result.id ?? "ok");
 }
 
 async function handleNotify(request: Request, env: Env): Promise<Response> {

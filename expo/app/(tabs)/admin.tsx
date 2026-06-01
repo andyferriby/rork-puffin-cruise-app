@@ -46,6 +46,7 @@ import { spacing, theme } from "@/constants/theme";
 import { fetchSchedule, type Cruise, type DaySchedule, type ScheduleConfig } from "@/lib/schedule";
 import { fetchBoatLocation, saveBoatLocation, stopBoatTracking, type BoatLocation } from "@/lib/boatTracker";
 import { supabase } from "@/lib/supabase";
+import { isAdminNotificationsEnabled, setAdminNotificationsEnabled } from "@/lib/notifications";
 
 const ADMIN_PIN_KEY = "@puffin_admin_pin";
 
@@ -1325,6 +1326,29 @@ function NotifySection() {
   const [notifyTarget, setNotifyTarget] = useState<"all" | "boarded">("all");
   const [sending, setSending] = useState<boolean>(false);
   const [sent, setSent] = useState<boolean>(false);
+  const [adminAlertsEnabled, setAdminAlertsEnabled] = useState<boolean>(false);
+  const [adminAlertsLoading, setAdminAlertsLoading] = useState<boolean>(false);
+
+  useEffect(() => {
+    isAdminNotificationsEnabled().then(setAdminAlertsEnabled).catch((err: unknown) => {
+      console.error("[admin] load admin alerts setting", err);
+    });
+  }, []);
+
+  const handleToggleAdminAlerts = useCallback(async () => {
+    const nextValue = !adminAlertsEnabled;
+    setAdminAlertsLoading(true);
+    try {
+      await setAdminNotificationsEnabled(nextValue);
+      setAdminAlertsEnabled(nextValue);
+      if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (err) {
+      console.error("[admin] admin alerts toggle", err);
+      Alert.alert("Could not update alerts", "Please check notification permissions and try again.");
+    } finally {
+      setAdminAlertsLoading(false);
+    }
+  }, [adminAlertsEnabled]);
 
   const handleSendNotification = useCallback(async () => {
     if (!notifyMessage.trim()) return;
@@ -1358,6 +1382,29 @@ function NotifySection() {
 
   return (
     <Section title="Notify Customers">
+      <View style={styles.notifyCard}>
+        <View style={styles.adminAlertRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.notifyLabel}>Admin booking alerts</Text>
+            <Text style={styles.adminAlertSub}>
+              {adminAlertsEnabled
+                ? "This device will be notified when a new booking is paid."
+                : "Enable on crew/admin phones to get new booking alerts."}
+            </Text>
+          </View>
+          <Pressable
+            onPress={handleToggleAdminAlerts}
+            disabled={adminAlertsLoading}
+            style={[styles.adminAlertToggle, adminAlertsEnabled && styles.adminAlertToggleOn, adminAlertsLoading && { opacity: 0.6 }]}
+          >
+            <Bell size={15} color={adminAlertsEnabled ? theme.white : theme.sea} />
+            <Text style={[styles.adminAlertToggleText, adminAlertsEnabled && styles.adminAlertToggleTextOn]}>
+              {adminAlertsLoading ? "…" : adminAlertsEnabled ? "On" : "Off"}
+            </Text>
+          </Pressable>
+        </View>
+      </View>
+
       <View style={styles.notifyCard}>
         <Text style={styles.notifyLabel}>Push notification message</Text>
         <TextInput
@@ -1990,6 +2037,39 @@ const styles = StyleSheet.create({
     color: theme.textMuted,
     textTransform: "uppercase",
     letterSpacing: 0.5,
+  },
+  adminAlertRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  adminAlertSub: {
+    color: theme.textMuted,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  adminAlertToggle: {
+    minWidth: 76,
+    minHeight: 42,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: theme.sea,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: theme.white,
+  },
+  adminAlertToggleOn: {
+    backgroundColor: theme.sea,
+  },
+  adminAlertToggleText: {
+    color: theme.sea,
+    fontSize: 13,
+    fontWeight: "900",
+  },
+  adminAlertToggleTextOn: {
+    color: theme.white,
   },
   notifyTargetRow: {
     flexDirection: "row",
