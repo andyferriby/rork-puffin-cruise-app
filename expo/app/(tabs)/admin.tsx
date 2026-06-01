@@ -72,6 +72,17 @@ type BoardedBooking = {
   status: string;
 };
 
+type MembershipRedeemResult = {
+  memberId: string;
+  email: string;
+  active: boolean;
+  creditsTotal: number;
+  creditsUsed: number;
+  creditsRemaining: number;
+  expiresAt: string;
+  discountPercent: number;
+};
+
 async function fetchBoardedBookings(): Promise<BoardedBooking[]> {
   const { data, error } = await supabase
     .from("bookings")
@@ -90,20 +101,47 @@ async function handleBarcodeScan(
   data: string,
   callbacks: {
     setScannedBooking: (b: ScannedBooking | null) => void;
+    setMembershipResult: (m: MembershipRedeemResult | null) => void;
     setScannerError: (e: string | null) => void;
   },
 ): Promise<void> {
-  const { setScannedBooking, setScannerError } = callbacks;
+  const { setScannedBooking, setMembershipResult, setScannerError } = callbacks;
+  const scannedValue = data.trim();
   try {
+    setMembershipResult(null);
+    if (scannedValue.startsWith("PUFFIN_MEMBER:")) {
+      const res = await fetch(`${BASE}/membership/redeem`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ memberId: scannedValue }),
+      });
+      const body = (await res.json()) as MembershipRedeemResult | { error?: string; record?: MembershipRedeemResult };
+      if (!res.ok) {
+        const errorText = body.error === "no_credits_remaining"
+          ? "This member has no trip credits remaining."
+          : body.error === "membership_inactive"
+            ? "This membership is inactive or expired."
+            : "Membership pass could not be redeemed.";
+        setMembershipResult("record" in body ? body.record ?? null : null);
+        setScannerError(errorText);
+        return;
+      }
+      setScannedBooking(null);
+      setMembershipResult(body as MembershipRedeemResult);
+      setScannerError(null);
+      if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      return;
+    }
+
     const { data: bookings, error } = await supabase
       .from("bookings")
       .select("id, customer_name, cruise_name, cruise_date, cruise_time, adults, children, status")
-      .eq("id", data.trim())
+      .eq("id", scannedValue)
       .limit(1);
 
     if (error) throw error;
     if (!bookings || bookings.length === 0) {
-      setScannerError("No booking found for this QR code.");
+      setScannerError("No booking or membership found for this QR code.");
       return;
     }
     const booking = bookings[0] as ScannedBooking;
@@ -112,7 +150,7 @@ async function handleBarcodeScan(
     if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   } catch (err) {
     console.error("[admin] scan lookup", err);
-    setScannerError("Could not look up booking. Check your connection.");
+    setScannerError("Could not process this QR code. Check your connection.");
   }
 }
 
@@ -255,6 +293,7 @@ function AdminEditor({
   // Scanner state
   const [scannerOpen, setScannerOpen] = useState<boolean>(false);
   const [scannedBooking, setScannedBooking] = useState<ScannedBooking | null>(null);
+  const [membershipResult, setMembershipResult] = useState<MembershipRedeemResult | null>(null);
   const [scannerError, setScannerError] = useState<string | null>(null);
   const [markingBoarded, setMarkingBoarded] = useState<boolean>(false);
   const [cameraPerm, requestCameraPerm] = useCameraPermissions();
@@ -289,6 +328,7 @@ function AdminEditor({
       if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       handleBarcodeScan(result.data, {
         setScannedBooking,
+        setMembershipResult,
         setScannerError,
       });
     },
@@ -694,6 +734,7 @@ function AdminEditor({
                   }
                   setScannerError(null);
                   setScannedBooking(null);
+                  setMembershipResult(null);
                   scanLockRef.current = false;
                   setScannerOpen(true);
                 }}
@@ -711,6 +752,7 @@ function AdminEditor({
                     onPress={() => {
                       setScannerOpen(false);
                       setScannedBooking(null);
+                      setMembershipResult(null);
                       scanLockRef.current = false;
                       setScannerError(null);
                     }}
@@ -729,7 +771,7 @@ function AdminEditor({
                     <View style={styles.scannerFrame} />
                   </View>
                 </View>
-                <Text style={styles.scannerHint}>Point camera at the QR code on a boarding pass</Text>
+                <Text style={styles.scannerHint}>Point camera at a boarding pass or member QR code</Text>
               </View>
             )}
 
@@ -737,6 +779,32 @@ function AdminEditor({
               <View style={styles.scannerErrorRow}>
                 <AlertCircle size={14} color={theme.coral} />
                 <Text style={styles.scannerErrorText}>{scannerError}</Text>
+              </View>
+            )}
+
+            {membershipResult && (
+              <View style={styles.scannedResult}>
+                <View style={styles.scannedStatusRow}>
+                  <CheckCircle size={18} color={theme.sea} />
+                  <Text style={styles.scannedStatusText}>Membership Trip Redeemed</Text>
+                </View>
+                <Text style={styles.scannedName}>{membershipResult.email}</Text>
+                <Text style={styles.scannedCruise}>Annual Puffin Membership</Text>
+                <Text style={styles.scannedMeta}>10% shop discount included</Text>
+                <View style={styles.scannedStatusBadge}>
+                  <Text style={styles.scannedStatusBadgeText}>{membershipResult.creditsRemaining} / {membershipResult.creditsTotal} TRIPS LEFT</Text>
+                </View>
+                <Text style={styles.scannedMeta}>Valid until {new Date(membershipResult.expiresAt).toLocaleDateString("en-GB")}</Text>
+                <Pressable
+                  onPress={() => {
+                    setMembershipResult(null);
+                    setScannerError(null);
+                    scanLockRef.current = false;
+                  }}
+                  style={styles.scanAnother}
+                >
+                  <Text style={styles.scanAnotherText}>Scan Another</Text>
+                </Pressable>
               </View>
             )}
 
@@ -809,6 +877,7 @@ function AdminEditor({
                 <Pressable
                   onPress={() => {
                     setScannedBooking(null);
+                    setMembershipResult(null);
                     setScannerError(null);
                     scanLockRef.current = false;
                   }}

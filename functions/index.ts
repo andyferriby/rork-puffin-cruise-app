@@ -1,4 +1,4 @@
-// Puffin Cruises backend: Stripe checkout, webhook, notifications + Supabase persistence.
+// Puffin Cruises backend: Stripe checkout, webhook, notifications, memberships + Supabase persistence.
 
 import { createOpenSslCompatiblePkcs7Signature } from "@swapnanildhol/passkit-pkcs7-signature";
 import { Buffer } from "node:buffer";
@@ -603,6 +603,96 @@ type NotifyBody = {
   appId: string;
 };
 
+type MembershipRecord = {
+  memberId: string;
+  email: string;
+  active: boolean;
+  creditsTotal: number;
+  creditsUsed: number;
+  creditsRemaining: number;
+  expiresAt: string;
+  discountPercent: number;
+  updatedAt: string;
+  redemptions: { at: string; creditsUsed: number }[];
+};
+
+type MembershipSyncBody = {
+  memberId: string;
+  email: string;
+  active: boolean;
+  expiresAt: string;
+};
+
+type MembershipRedeemBody = {
+  memberId: string;
+};
+
+function membershipKey(memberId: string): string {
+  return `membership:${memberId}`;
+}
+
+async function getMembership(env: Env, memberId: string): Promise<MembershipRecord | null> {
+  const res = await supa(env, `/app_config?key=eq.${encodeURIComponent(membershipKey(memberId))}&select=value&limit=1`, { method: "GET" });
+  if (!res.ok) return null;
+  const rows = (await res.json()) as { value: MembershipRecord }[];
+  return rows[0]?.value ?? null;
+}
+
+async function saveMembership(env: Env, record: MembershipRecord): Promise<void> {
+  const res = await supa(env, `/app_config`, {
+    method: "POST",
+    body: JSON.stringify({ key: membershipKey(record.memberId), value: record, updated_at: new Date().toISOString() }),
+    headers: { Prefer: "resolution=merge-duplicates,return=representation" },
+  });
+  if (!res.ok) throw new Error(`membership_save_failed:${res.status}`);
+}
+
+async function handleMembershipSync(request: Request, env: Env): Promise<Response> {
+  const body = (await request.json()) as MembershipSyncBody;
+  const memberId = body.memberId?.trim();
+  const email = body.email?.trim().toLowerCase();
+  if (!memberId || !email) return json({ error: "missing_member_or_email" }, { status: 400 });
+
+  const existing = await getMembership(env, memberId);
+  const expiresAt = body.expiresAt || existing?.expiresAt || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
+  const isNewYear = existing?.expiresAt ? new Date(existing.expiresAt).getTime() < Date.now() : false;
+  const creditsUsed = isNewYear ? 0 : existing?.creditsUsed ?? 0;
+  const record: MembershipRecord = {
+    memberId,
+    email,
+    active: Boolean(body.active),
+    creditsTotal: 12,
+    creditsUsed,
+    creditsRemaining: Math.max(0, 12 - creditsUsed),
+    expiresAt,
+    discountPercent: 10,
+    updatedAt: new Date().toISOString(),
+    redemptions: isNewYear ? [] : existing?.redemptions ?? [],
+  };
+  await saveMembership(env, record);
+  return json(record);
+}
+
+async function handleMembershipRedeem(request: Request, env: Env): Promise<Response> {
+  const body = (await request.json()) as MembershipRedeemBody;
+  const raw = body.memberId?.trim().replace(/^PUFFIN_MEMBER:/, "");
+  if (!raw) return json({ error: "missing_member_id" }, { status: 400 });
+  const record = await getMembership(env, raw);
+  if (!record) return json({ error: "member_not_found" }, { status: 404 });
+  if (!record.active || new Date(record.expiresAt).getTime() < Date.now()) return json({ error: "membership_inactive", record }, { status: 409 });
+  if (record.creditsRemaining <= 0) return json({ error: "no_credits_remaining", record }, { status: 409 });
+
+  const next: MembershipRecord = {
+    ...record,
+    creditsUsed: record.creditsUsed + 1,
+    creditsRemaining: Math.max(0, record.creditsRemaining - 1),
+    updatedAt: new Date().toISOString(),
+    redemptions: [...(record.redemptions ?? []), { at: new Date().toISOString(), creditsUsed: record.creditsUsed + 1 }],
+  };
+  await saveMembership(env, next);
+  return json(next);
+}
+
 type AdminBookingAlert = {
   id: string;
   customer_name: string;
@@ -819,6 +909,24 @@ export default {
       } catch (err) {
         console.error("notify error", err);
         return json({ error: "notify_error" }, { status: 500 });
+      }
+    }
+
+    if (url.pathname === "/membership/sync" && request.method === "POST") {
+      try {
+        return await handleMembershipSync(request, env);
+      } catch (err) {
+        console.error("membership sync error", err);
+        return json({ error: "membership_sync_error" }, { status: 500 });
+      }
+    }
+
+    if (url.pathname === "/membership/redeem" && request.method === "POST") {
+      try {
+        return await handleMembershipRedeem(request, env);
+      } catch (err) {
+        console.error("membership redeem error", err);
+        return json({ error: "membership_redeem_error" }, { status: 500 });
       }
     }
 

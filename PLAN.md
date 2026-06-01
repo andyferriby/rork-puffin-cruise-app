@@ -1,20 +1,22 @@
-# Add Coquet Island live cameras and WooCommerce shop
-
+# Add £100/year Puffin Cruises membership
 
 ## Features
 
-- [x] **Live Cameras tab** — dedicated screen with 4 embedded YouTube live streams showing Coquet Island cameras. Crew can update the video links daily from the admin panel without needing a new build. Thumbnail placeholders show while streams load, and each stream has a short label (e.g. "Puffin Colony", "North Cliffs").
+- [x] **£100 annual membership** — RevenueCat membership product configured for £100/year in the Test Store with a membership entitlement and annual package.
 
-- [x] **Shop tab** — pulls real products from your WooCommerce store (prices, images, descriptions, stock status) and displays them in a clean product grid. Tapping a product shows full details. Tapping "Buy" opens the WooCommerce website to complete checkout with your existing Stripe payment flow — no additional payment integration needed.
+- [x] **Membership tab** — customers can buy or restore membership, enter their email, and create a QR member pass.
 
-- [x] **Admin panel additions** — two new sections below the existing schedule editor: one for updating the 4 YouTube video IDs (saved to Supabase so they update instantly), and one for entering your WooCommerce store URL and consumer keys so the shop tab pulls live product data.
+- [x] **12 trip credits** — each active member receives 12 annual adult boat trip credits, tracked server-side.
+
+- [x] **Admin QR redemption** — admin scanner accepts membership QR codes and deducts 1 trip credit when scanned.
+
+- [x] **Shop discount shown** — member pass clearly shows the included 10% shop discount.
 
 ## Design
 
-Both screens follow the existing nautical theme — deep navy backgrounds, sea-blue accents, rounded card layouts. The live cameras screen shows a stacked grid of video players with puffin-orange accent borders. The shop screen uses a two-column product grid with soft-shadow product cards, price badges in sea-blue, and smooth loading skeletons.
+The membership screen uses a premium deep-sea card style with gold accents, a large annual price panel, clear benefits, and a high-contrast QR member pass.
 
 ## Screens
 
-- [x] **Live Cameras** — new tab showing 4 YouTube live streams stacked vertically, each with a label and loading placeholder
-- [x] **Shop** — new tab with product grid, product detail view, and a link-out to your WooCommerce store for checkout
-- [x] **Admin (updated)** — adds YouTube link manager and WooCommerce config sections
+- [x] **Membership** — new customer-facing tab for paywall, restore purchases, QR pass creation, trip credits, and expiry date.
+- [x] **Admin (updated)** — existing QR scanner now recognises both boarding passes and membership passes.
