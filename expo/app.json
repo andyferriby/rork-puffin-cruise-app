@@ -7,7 +7,7 @@
     "icon": "./assets/images/icon.png",
     "scheme": "rork-app",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "splash": {
       "image": "./assets/images/splash-icon.png",
       "resizeMode": "contain",
@@ -16,7 +16,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "app.rork.gpczuon7nhtm91bqwzkc7",
-      "buildNumber": "62",
+      "buildNumber": "63",
       "entitlements": {
         "aps-environment": "production",
         "com.apple.security.application-groups": [
@@ -36,7 +36,7 @@
         "backgroundColor": "#ffffff"
       },
       "package": "app.rork.gpczuon7nhtm91bqwzkc7",
-      "versionCode": 62
+      "versionCode": 63
     },
     "web": {
       "favicon": "./assets/images/favicon.png"
