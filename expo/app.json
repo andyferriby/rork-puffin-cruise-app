@@ -2,7 +2,7 @@
   "expo": {
     "name": "Puffin Cruises Amble",
     "slug": "in0r796f9fdds07w9xb7v",
-    "version": "1.0.0",
+    "version": "1.0.5",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "rork-app",
@@ -16,6 +16,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "app.rork.gpczuon7nhtm91bqwzkc7",
+      "buildNumber": "62",
       "entitlements": {
         "aps-environment": "production",
         "com.apple.security.application-groups": [
@@ -34,7 +35,8 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "app.rork.gpczuon7nhtm91bqwzkc7"
+      "package": "app.rork.gpczuon7nhtm91bqwzkc7",
+      "versionCode": 62
     },
     "web": {
       "favicon": "./assets/images/favicon.png"
