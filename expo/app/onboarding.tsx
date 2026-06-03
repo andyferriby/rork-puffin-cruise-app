@@ -3,17 +3,18 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { ArrowRight } from "lucide-react-native";
 import React, { useMemo, useState } from "react";
-import { FlatList, Pressable, StyleSheet, Text, useWindowDimensions, View, type ViewToken } from "react-native";
+import { FlatList, Image, Pressable, StyleSheet, Text, useWindowDimensions, View, type ViewToken } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { theme } from "@/constants/theme";
 
 const ONBOARDING_KEY = "@puffin_has_seen_onboarding";
+const WELCOME_IMAGE_URL = "https://pub-e001eb4506b145aa938b5d3badbff6a5.r2.dev/attachments/15u8674bi1whzrli6yogm.png";
 
-type Slide = { emoji: string; title: string; subtitle: string; colors: readonly [string, string] };
+type Slide = { emoji: string; title: string; subtitle: string; colors: readonly [string, string]; showWelcomeImage?: boolean };
 
 const slides: Slide[] = [
-  { emoji: "⛴️", title: "Welcome to\nPuffin Cruises", subtitle: "Book family-run wildlife adventures from Amble Harbour to Coquet Island.", colors: [theme.deep, theme.sea] },
+  { emoji: "⛴️", title: "Welcome to\nPuffin Cruises", subtitle: "Book family-run wildlife adventures from Amble Harbour to Coquet Island.", colors: [theme.deep, theme.sea], showWelcomeImage: true },
   { emoji: "📅", title: "Book Your\nAdventure", subtitle: "Choose your cruise, sailing time, passengers and pay securely by card.", colors: [theme.sea, theme.wave] },
   { emoji: "🦭", title: "Meet the\nWildlife", subtitle: "Use the wildlife guide to spot puffins, seals, Arctic terns and island birds.", colors: [theme.coral, theme.puffin] },
   { emoji: "📍", title: "Track the\nBoat Live", subtitle: "Follow the cruise on the interactive map when crew share live position updates from the water.", colors: [theme.wave, theme.deep] },
@@ -71,6 +72,14 @@ export default function OnboardingScreen() {
             </LinearGradient>
             <Text style={styles.title}>{item.title}</Text>
             <Text style={styles.subtitle}>{item.subtitle}</Text>
+            {item.showWelcomeImage ? (
+              <Image
+                source={{ uri: WELCOME_IMAGE_URL }}
+                style={styles.welcomeImage}
+                resizeMode="contain"
+                accessibilityLabel="Puffin Cruises welcome artwork"
+              />
+            ) : null}
           </View>
         )}
       />
@@ -94,6 +103,7 @@ const styles = StyleSheet.create({
   emoji: { fontSize: 66 },
   title: { marginTop: 42, color: theme.white, fontSize: 34, lineHeight: 38, fontWeight: "900", textAlign: "center" },
   subtitle: { marginTop: 18, color: "rgba(255,255,255,0.78)", fontSize: 17, lineHeight: 25, textAlign: "center" },
+  welcomeImage: { width: "82%", height: 120, marginTop: 22 },
   bottom: { position: "absolute", left: 24, right: 24, bottom: 0 },
   dots: { flexDirection: "row", justifyContent: "center", gap: 9, marginBottom: 28 },
   dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "rgba(255,255,255,0.32)" },
