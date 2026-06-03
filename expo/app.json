@@ -17,10 +17,7 @@
       "supportsTablet": false,
       "bundleIdentifier": "app.rork.gpczuon7nhtm91bqwzkc7",
       "entitlements": {
-        "aps-environment": "production",
-        "com.apple.security.application-groups": [
-          "group.app.rork.gpczuon7nhtm91bqwzkc7.onesignal"
-        ]
+        "aps-environment": "production"
       },
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Crew can share the boat position during a sailing so customers can see live progress on the map.",
@@ -43,7 +40,8 @@
       [
         "onesignal-expo-plugin",
         {
-          "mode": "production"
+          "mode": "production",
+          "disableNSE": true
         }
       ],
       [
