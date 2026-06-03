@@ -7,24 +7,45 @@ const ADMIN_NOTIFICATIONS_ENABLED_KEY = "@puffin_admin_notifications_enabled";
 const ONE_SIGNAL_APP_ID = process.env.EXPO_PUBLIC_ONESIGNAL_APP_ID ?? "";
 const ADMIN_PUSH_TAG = "admin_alerts";
 
+let hasInitializedOneSignal = false;
+
 /** Initialize OneSignal on app startup. Call once from the root layout. */
-export function initOneSignal(): void {
+export function initOneSignal(): boolean {
   if (!ONE_SIGNAL_APP_ID) {
     console.warn("[onesignal] No App ID set — push notifications disabled");
-    return;
+    return false;
   }
 
-  OneSignal.initialize(ONE_SIGNAL_APP_ID);
+  if (!hasInitializedOneSignal) {
+    OneSignal.initialize(ONE_SIGNAL_APP_ID);
+    hasInitializedOneSignal = true;
+  }
+
+  return true;
+}
+
+async function requestPushPermission(): Promise<boolean> {
+  if (!initOneSignal()) return false;
+
+  try {
+    const granted = await OneSignal.Notifications.requestPermission(true);
+    OneSignal.User.pushSubscription.optIn();
+    return granted;
+  } catch (err) {
+    console.error("[onesignal] permission request failed", err);
+    return false;
+  }
 }
 
 /** Register a callback for notification taps. */
 export function onNotificationTap(callback: () => void): void {
+  if (!initOneSignal()) return;
   OneSignal.Notifications.addEventListener("click", callback);
 }
 
 /** Link an email to this device so the admin can target them via OneSignal REST API. */
 export function linkEmailToPush(email: string): void {
-  if (!email.trim()) return;
+  if (!email.trim() || !initOneSignal()) return;
   OneSignal.User.addAlias("external_id", email.toLowerCase().trim());
   OneSignal.User.addEmail(email.toLowerCase().trim());
 }
@@ -36,16 +57,17 @@ export async function isNotificationsEnabled(): Promise<boolean> {
 }
 
 /** Toggle push notifications on/off. */
-export async function setNotificationsEnabled(enabled: boolean, email?: string): Promise<void> {
-  await AsyncStorage.setItem(NOTIFICATIONS_ENABLED_KEY, String(enabled));
-
+export async function setNotificationsEnabled(enabled: boolean, email?: string): Promise<boolean> {
   if (enabled) {
-    OneSignal.Notifications.requestPermission(true);
-    OneSignal.User.pushSubscription.optIn();
-    if (email) linkEmailToPush(email);
-  } else {
-    OneSignal.User.pushSubscription.optOut();
+    const granted = await requestPushPermission();
+    await AsyncStorage.setItem(NOTIFICATIONS_ENABLED_KEY, String(granted));
+    if (granted && email) linkEmailToPush(email);
+    return granted;
   }
+
+  await AsyncStorage.setItem(NOTIFICATIONS_ENABLED_KEY, "false");
+  if (initOneSignal()) OneSignal.User.pushSubscription.optOut();
+  return false;
 }
 
 /** Check if this device is enrolled for private admin booking alerts. */
@@ -55,14 +77,15 @@ export async function isAdminNotificationsEnabled(): Promise<boolean> {
 }
 
 /** Enroll or remove this device from private admin booking alerts. */
-export async function setAdminNotificationsEnabled(enabled: boolean): Promise<void> {
-  await AsyncStorage.setItem(ADMIN_NOTIFICATIONS_ENABLED_KEY, String(enabled));
-
+export async function setAdminNotificationsEnabled(enabled: boolean): Promise<boolean> {
   if (enabled) {
-    OneSignal.Notifications.requestPermission(true);
-    OneSignal.User.pushSubscription.optIn();
-    OneSignal.User.addTag(ADMIN_PUSH_TAG, "true");
-  } else {
-    OneSignal.User.removeTag(ADMIN_PUSH_TAG);
+    const granted = await requestPushPermission();
+    await AsyncStorage.setItem(ADMIN_NOTIFICATIONS_ENABLED_KEY, String(granted));
+    if (granted) OneSignal.User.addTag(ADMIN_PUSH_TAG, "true");
+    return granted;
   }
+
+  await AsyncStorage.setItem(ADMIN_NOTIFICATIONS_ENABLED_KEY, "false");
+  if (initOneSignal()) OneSignal.User.removeTag(ADMIN_PUSH_TAG);
+  return false;
 }

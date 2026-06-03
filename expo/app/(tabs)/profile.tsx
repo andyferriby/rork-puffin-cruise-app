@@ -46,9 +46,18 @@ export default function ProfileScreen() {
   const handleToggleNotifications = useCallback(async () => {
     setNotifLoading(true);
     const newValue = !notifEnabled;
-    await setNotificationsEnabled(newValue, email || undefined);
-    setNotifEnabled(newValue);
-    setNotifLoading(false);
+    try {
+      const enabled = await setNotificationsEnabled(newValue, email || undefined);
+      setNotifEnabled(enabled);
+      if (newValue && !enabled) {
+        Alert.alert("Notifications not enabled", "Please allow notifications in your device settings, then try again.");
+      }
+    } catch (err) {
+      console.error("[profile] notification toggle", err);
+      Alert.alert("Could not update notifications", "Please check your device settings and try again.");
+    } finally {
+      setNotifLoading(false);
+    }
   }, [notifEnabled, email]);
 
   const completedTrips = data.filter((b) => b.status === "paid" || new Date(b.cruise_date) < new Date()).length;

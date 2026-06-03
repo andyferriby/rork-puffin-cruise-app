@@ -1408,9 +1408,13 @@ function NotifySection() {
     const nextValue = !adminAlertsEnabled;
     setAdminAlertsLoading(true);
     try {
-      await setAdminNotificationsEnabled(nextValue);
-      setAdminAlertsEnabled(nextValue);
-      if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      const enabled = await setAdminNotificationsEnabled(nextValue);
+      setAdminAlertsEnabled(enabled);
+      if (nextValue && !enabled) {
+        Alert.alert("Notifications not enabled", "Please allow notifications in your device settings, then try again.");
+      } else if (Platform.OS !== "web") {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
     } catch (err) {
       console.error("[admin] admin alerts toggle", err);
       Alert.alert("Could not update alerts", "Please check notification permissions and try again.");

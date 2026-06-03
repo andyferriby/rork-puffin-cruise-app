@@ -4,8 +4,9 @@ const NOTIFICATIONS_ENABLED_KEY = "@puffin_notifications_enabled";
 const ADMIN_NOTIFICATIONS_ENABLED_KEY = "@puffin_admin_notifications_enabled";
 
 /** No-op on web — OneSignal is native-only. */
-export function initOneSignal(): void {
+export function initOneSignal(): boolean {
   // Not available on web
+  return false;
 }
 
 /** No-op on web — OneSignal is native-only. */
@@ -25,8 +26,9 @@ export async function isNotificationsEnabled(): Promise<boolean> {
 }
 
 /** Toggle push notifications on/off. No-op on web. */
-export async function setNotificationsEnabled(enabled: boolean, _email?: string): Promise<void> {
+export async function setNotificationsEnabled(enabled: boolean, _email?: string): Promise<boolean> {
   await AsyncStorage.setItem(NOTIFICATIONS_ENABLED_KEY, String(enabled));
+  return false;
 }
 
 /** Check if this device is enrolled for private admin booking alerts. */
@@ -36,6 +38,7 @@ export async function isAdminNotificationsEnabled(): Promise<boolean> {
 }
 
 /** Enroll or remove this device from private admin booking alerts. No-op on web. */
-export async function setAdminNotificationsEnabled(enabled: boolean): Promise<void> {
+export async function setAdminNotificationsEnabled(enabled: boolean): Promise<boolean> {
   await AsyncStorage.setItem(ADMIN_NOTIFICATIONS_ENABLED_KEY, String(enabled));
+  return false;
 }
