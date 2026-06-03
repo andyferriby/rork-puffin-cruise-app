@@ -19,7 +19,10 @@
     {
       "name": "iOS",
       "path": "ios",
-      "framework": "swift"
+      "framework": "swift",
+      "settings": {
+        "iosBundleId": "app.rork.gpczuon7nhtm91bqwzkc7"
+      }
     }
   ]
 }

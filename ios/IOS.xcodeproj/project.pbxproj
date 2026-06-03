@@ -33,6 +33,24 @@
 		105FC5932E9EAD3200EA8BCF /* IOSUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = IOSUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		105FC57C2E9EAD3100EA8BCF /* IOS */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = IOS;
+			sourceTree = "<group>";
+		};
+		105FC58C2E9EAD3200EA8BCF /* IOSTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = IOSTests;
+			sourceTree = "<group>";
+		};
+		105FC5962E9EAD3200EA8BCF /* IOSUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = IOSUITests;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
 /* Begin PBXFrameworksBuildPhase section */
 		105FC5772E9EAD3100EA8BCF /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
@@ -57,24 +75,6 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
-
-/* Begin PBXFileSystemSynchronizedRootGroup section */
-		105FC57C2E9EAD3100EA8BCF /* IOS */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = IOS;
-			sourceTree = "<group>";
-		};
-		105FC58C2E9EAD3200EA8BCF /* IOSTests */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = IOSTests;
-			sourceTree = "<group>";
-		};
-		105FC5962E9EAD3200EA8BCF /* IOSUITests */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = IOSUITests;
-			sourceTree = "<group>";
-		};
-/* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXGroup section */
 		105FC5712E9EAD3100EA8BCF = {
@@ -193,6 +193,7 @@
 				};
 			};
 			buildConfigurationList = 105FC5752E9EAD3100EA8BCF /* Build configuration list for PBXProject "IOS" */;
+			compatibilityVersion = "Xcode 3.2";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -201,6 +202,9 @@
 			);
 			mainGroup = 105FC5712E9EAD3100EA8BCF;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				XX20EB7F6EA71E9F2E096CXX /* XCRemoteSwiftPackageReference "supabase-swift.git" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 105FC57B2E9EAD3100EA8BCF /* Products */;
 			projectDirPath = "";
@@ -209,9 +213,6 @@
 				105FC5792E9EAD3100EA8BCF /* IOS */,
 				105FC5882E9EAD3200EA8BCF /* IOSTests */,
 				105FC5922E9EAD3200EA8BCF /* IOSUITests */,
-			);
-			packageReferences = (
-				XX20EB7F6EA71E9F2E096CXX /* XCRemoteSwiftPackageReference "supabase-swift" */,
 			);
 		};
 /* End PBXProject section */
@@ -593,7 +594,7 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		XX20EB7F6EA71E9F2E096CXX /* XCRemoteSwiftPackageReference "supabase-swift" */ = {
+		XX20EB7F6EA71E9F2E096CXX /* XCRemoteSwiftPackageReference "supabase-swift.git" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/supabase/supabase-swift.git";
 			requirement = {
@@ -606,7 +607,7 @@
 /* Begin XCSwiftPackageProductDependency section */
 		XX1C9FF110ABBCE8BF456CXX /* Supabase */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = XX20EB7F6EA71E9F2E096CXX /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			package = XX20EB7F6EA71E9F2E096CXX /* XCRemoteSwiftPackageReference "supabase-swift.git" */;
 			productName = Supabase;
 		};
 /* End XCSwiftPackageProductDependency section */
