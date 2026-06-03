@@ -17,13 +17,8 @@ export function initOneSignal(): boolean {
   }
 
   if (!hasInitializedOneSignal) {
-    try {
-      OneSignal.initialize(ONE_SIGNAL_APP_ID);
-      hasInitializedOneSignal = true;
-    } catch (err) {
-      console.error("[onesignal] initialization failed", err);
-      return false;
-    }
+    OneSignal.initialize(ONE_SIGNAL_APP_ID);
+    hasInitializedOneSignal = true;
   }
 
   return true;
@@ -45,24 +40,14 @@ async function requestPushPermission(): Promise<boolean> {
 /** Register a callback for notification taps. */
 export function onNotificationTap(callback: () => void): void {
   if (!initOneSignal()) return;
-
-  try {
-    OneSignal.Notifications.addEventListener("click", callback);
-  } catch (err) {
-    console.error("[onesignal] notification listener failed", err);
-  }
+  OneSignal.Notifications.addEventListener("click", callback);
 }
 
 /** Link an email to this device so the admin can target them via OneSignal REST API. */
 export function linkEmailToPush(email: string): void {
   if (!email.trim() || !initOneSignal()) return;
-
-  try {
-    OneSignal.User.addAlias("external_id", email.toLowerCase().trim());
-    OneSignal.User.addEmail(email.toLowerCase().trim());
-  } catch (err) {
-    console.error("[onesignal] email link failed", err);
-  }
+  OneSignal.User.addAlias("external_id", email.toLowerCase().trim());
+  OneSignal.User.addEmail(email.toLowerCase().trim());
 }
 
 /** Check if the user has opted into notifications (stored locally). */
@@ -81,13 +66,7 @@ export async function setNotificationsEnabled(enabled: boolean, email?: string):
   }
 
   await AsyncStorage.setItem(NOTIFICATIONS_ENABLED_KEY, "false");
-  if (initOneSignal()) {
-    try {
-      OneSignal.User.pushSubscription.optOut();
-    } catch (err) {
-      console.error("[onesignal] opt-out failed", err);
-    }
-  }
+  if (initOneSignal()) OneSignal.User.pushSubscription.optOut();
   return false;
 }
 
@@ -113,12 +92,6 @@ export async function setAdminNotificationsEnabled(enabled: boolean): Promise<bo
   }
 
   await AsyncStorage.setItem(ADMIN_NOTIFICATIONS_ENABLED_KEY, "false");
-  if (initOneSignal()) {
-    try {
-      OneSignal.User.removeTag(ADMIN_PUSH_TAG);
-    } catch (err) {
-      console.error("[onesignal] admin tag removal failed", err);
-    }
-  }
+  if (initOneSignal()) OneSignal.User.removeTag(ADMIN_PUSH_TAG);
   return false;
 }
