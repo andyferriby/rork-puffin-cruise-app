@@ -7,7 +7,6 @@ import * as Location from "expo-location";
 import {
   AlertCircle,
   Anchor,
-  Bell,
   Calendar,
   CheckCircle,
   Key,
@@ -46,7 +45,6 @@ import { spacing, theme } from "@/constants/theme";
 import { fetchSchedule, type Cruise, type DaySchedule, type ScheduleConfig } from "@/lib/schedule";
 import { fetchBoatLocation, saveBoatLocation, stopBoatTracking, type BoatLocation } from "@/lib/boatTracker";
 import { supabase } from "@/lib/supabase";
-import { isAdminNotificationsEnabled, setAdminNotificationsEnabled } from "@/lib/notifications";
 
 const ADMIN_PIN_KEY = "@puffin_admin_pin";
 
@@ -621,9 +619,6 @@ function AdminEditor({
             </Text>
           </View>
         </Section>
-
-        {/* Push Notifications */}
-        <NotifySection />
 
         {/* On Board List */}
         <Section title="Currently On Board">
@@ -1381,150 +1376,6 @@ function WooSection() {
           )}
           <Text style={styles.notifySendBtnText}>
             {saving ? "Saving…" : saved ? "Saved!" : "Save Shop Config"}
-          </Text>
-        </Pressable>
-      </View>
-    </Section>
-  );
-}
-
-// ── Push Notification Sender ─────────────────────────────────────
-
-function NotifySection() {
-  const [notifyMessage, setNotifyMessage] = useState<string>("");
-  const [notifyTarget, setNotifyTarget] = useState<"all" | "boarded">("all");
-  const [sending, setSending] = useState<boolean>(false);
-  const [sent, setSent] = useState<boolean>(false);
-  const [adminAlertsEnabled, setAdminAlertsEnabled] = useState<boolean>(false);
-  const [adminAlertsLoading, setAdminAlertsLoading] = useState<boolean>(false);
-
-  useEffect(() => {
-    isAdminNotificationsEnabled().then(setAdminAlertsEnabled).catch((err: unknown) => {
-      console.error("[admin] load admin alerts setting", err);
-    });
-  }, []);
-
-  const handleToggleAdminAlerts = useCallback(async () => {
-    const nextValue = !adminAlertsEnabled;
-    setAdminAlertsLoading(true);
-    try {
-      const enabled = await setAdminNotificationsEnabled(nextValue);
-      setAdminAlertsEnabled(enabled);
-      if (nextValue && !enabled) {
-        Alert.alert("Notifications not enabled", "Please allow notifications in your device settings, then try again.");
-      } else if (Platform.OS !== "web") {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      }
-    } catch (err) {
-      console.error("[admin] admin alerts toggle", err);
-      Alert.alert("Could not update alerts", "Please check notification permissions and try again.");
-    } finally {
-      setAdminAlertsLoading(false);
-    }
-  }, [adminAlertsEnabled]);
-
-  const handleSendNotification = useCallback(async () => {
-    if (!notifyMessage.trim()) return;
-    setSending(true);
-    try {
-      const res = await fetch(`${BASE}/notify`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          heading: "Puffin Cruises",
-          message: notifyMessage.trim(),
-          target: notifyTarget,
-          appId: process.env.EXPO_PUBLIC_ONESIGNAL_APP_ID ?? "",
-        }),
-      });
-      if (!res.ok) {
-        const err = await res.json() as { error?: string };
-        throw new Error(err.error ?? `HTTP ${res.status}`);
-      }
-      setSent(true);
-      setNotifyMessage("");
-      if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setTimeout(() => setSent(false), 3000);
-    } catch (err) {
-      console.error("[admin] notify send", err);
-      Alert.alert("Send failed", err instanceof Error ? err.message : "Could not send notifications. Check your connection and try again.");
-    } finally {
-      setSending(false);
-    }
-  }, [notifyMessage, notifyTarget]);
-
-  return (
-    <Section title="Notify Customers">
-      <View style={styles.notifyCard}>
-        <View style={styles.adminAlertRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.notifyLabel}>Admin booking alerts</Text>
-            <Text style={styles.adminAlertSub}>
-              {adminAlertsEnabled
-                ? "This device will be notified when a new booking is paid."
-                : "Enable on crew/admin phones to get new booking alerts."}
-            </Text>
-          </View>
-          <Pressable
-            onPress={handleToggleAdminAlerts}
-            disabled={adminAlertsLoading}
-            style={[styles.adminAlertToggle, adminAlertsEnabled && styles.adminAlertToggleOn, adminAlertsLoading && { opacity: 0.6 }]}
-          >
-            <Bell size={15} color={adminAlertsEnabled ? theme.white : theme.sea} />
-            <Text style={[styles.adminAlertToggleText, adminAlertsEnabled && styles.adminAlertToggleTextOn]}>
-              {adminAlertsLoading ? "…" : adminAlertsEnabled ? "On" : "Off"}
-            </Text>
-          </Pressable>
-        </View>
-      </View>
-
-      <View style={styles.notifyCard}>
-        <Text style={styles.notifyLabel}>Push notification message</Text>
-        <TextInput
-          value={notifyMessage}
-          onChangeText={setNotifyMessage}
-          placeholder="e.g. Sailing times updated — check the app!"
-          placeholderTextColor={theme.textMuted}
-          multiline
-          style={[styles.field, { minHeight: 80 }]}
-        />
-
-        <Text style={styles.notifyLabel}>Send to</Text>
-        <View style={styles.notifyTargetRow}>
-          <Pressable
-            onPress={() => setNotifyTarget("all")}
-            style={[styles.notifyTargetBtn, notifyTarget === "all" && styles.notifyTargetBtnActive]}
-          >
-            <Users size={14} color={notifyTarget === "all" ? theme.white : theme.textMuted} />
-            <Text style={[styles.notifyTargetText, notifyTarget === "all" && styles.notifyTargetTextActive]}>All customers</Text>
-          </Pressable>
-          <Pressable
-            onPress={() => setNotifyTarget("boarded")}
-            style={[styles.notifyTargetBtn, notifyTarget === "boarded" && styles.notifyTargetBtnActive]}
-          >
-            <Anchor size={14} color={notifyTarget === "boarded" ? theme.white : theme.textMuted} />
-            <Text style={[styles.notifyTargetText, notifyTarget === "boarded" && styles.notifyTargetTextActive]}>Boarded only</Text>
-          </Pressable>
-        </View>
-
-        <Pressable
-          onPress={handleSendNotification}
-          disabled={!notifyMessage.trim() || sending}
-          style={({ pressed }) => [
-            styles.notifySendBtn,
-            (!notifyMessage.trim() || sending) && { opacity: 0.5 },
-            pressed && { opacity: 0.85 },
-          ]}
-        >
-          {sending ? (
-            <ActivityIndicator color={theme.white} size="small" />
-          ) : sent ? (
-            <CheckCircle size={18} color={theme.white} />
-          ) : (
-            <Bell size={18} color={theme.white} />
-          )}
-          <Text style={styles.notifySendBtnText}>
-            {sending ? "Sending…" : sent ? "Sent!" : "Send Push Notification"}
           </Text>
         </Pressable>
       </View>

@@ -6,7 +6,6 @@ import { StatusBar } from "expo-status-bar";
 import React, { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { ONBOARDING_KEY } from "@/app/onboarding";
-import { initOneSignal } from "@/lib/notifications";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -35,8 +34,6 @@ function RootLayoutNav() {
 
 export default function RootLayout() {
   useEffect(() => {
-    initOneSignal();
-
     const prepare = async (): Promise<void> => {
       const hasSeenOnboarding = await AsyncStorage.getItem(ONBOARDING_KEY);
       await SplashScreen.hideAsync();
