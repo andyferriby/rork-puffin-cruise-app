@@ -6,7 +6,6 @@ import { StatusBar } from "expo-status-bar";
 import React, { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { ONBOARDING_KEY } from "@/app/onboarding";
-import { initOneSignal, onNotificationTap } from "@/lib/notifications";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -39,21 +38,11 @@ export default function RootLayout() {
       const hasSeenOnboarding = await AsyncStorage.getItem(ONBOARDING_KEY);
       await SplashScreen.hideAsync();
 
-      // Initialize OneSignal for push notifications
-      initOneSignal();
-
       if (!hasSeenOnboarding) {
         router.replace("/onboarding");
       }
     };
     prepare();
-  }, []);
-
-  // Handle notification taps — navigate to tickets tab
-  useEffect(() => {
-    onNotificationTap(() => {
-      router.replace("/(tabs)/tickets");
-    });
   }, []);
 
   return (
