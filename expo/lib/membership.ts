@@ -5,14 +5,15 @@ import Purchases, { CustomerInfo, PurchasesOffering } from "react-native-purchas
 const BASE = process.env.EXPO_PUBLIC_RORK_FUNCTIONS_URL ?? "";
 const MEMBER_ID_KEY = "@puffin_member_id";
 const TEST_KEY = "test_SCHOyVPxfMqXbovqKbIDwIqpRgN";
+const IOS_LIVE_KEY = "appl_otLFzRBmUwDxcahJfwKDGkvvLxm";
 const ENTITLEMENT = "membership";
 
 let configured = false;
 
 function revenueCatKey(): string {
-  if (__DEV__ || Platform.OS === "web") return process.env.EXPO_PUBLIC_REVENUECAT_TEST_API_KEY ?? TEST_KEY;
+  if (Platform.OS === "web") return process.env.EXPO_PUBLIC_REVENUECAT_TEST_API_KEY ?? TEST_KEY;
   return Platform.select({
-    ios: process.env.EXPO_PUBLIC_REVENUECAT_IOS_API_KEY,
+    ios: process.env.EXPO_PUBLIC_REVENUECAT_IOS_API_KEY ?? IOS_LIVE_KEY,
     android: process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY,
     default: process.env.EXPO_PUBLIC_REVENUECAT_TEST_API_KEY,
   }) ?? TEST_KEY;
