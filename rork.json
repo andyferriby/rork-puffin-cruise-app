@@ -15,14 +15,6 @@
       "name": "Backend",
       "path": "backend",
       "framework": "supabase"
-    },
-    {
-      "name": "iOS",
-      "path": "ios",
-      "framework": "swift",
-      "settings": {
-        "iosBundleId": "app.rork.gpczuon7nhtm91bqwzkc7"
-      }
     }
   ]
 }
