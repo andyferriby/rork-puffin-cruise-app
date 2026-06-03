@@ -1,5 +1,26 @@
-import { OneSignal } from "react-native-onesignal";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Platform } from "react-native";
+
+import type { OneSignal as OneSignalType } from "react-native-onesignal";
+
+type OneSignalModule = typeof OneSignalType;
+
+let oneSignalModule: OneSignalModule | null | undefined;
+
+function getOneSignal(): OneSignalModule | null {
+  if (oneSignalModule !== undefined) return oneSignalModule;
+
+  try {
+    // OneSignal is not always available in preview clients/simulators. Keep production push intact,
+    // but do not let a missing native module crash app startup.
+    oneSignalModule = require("react-native-onesignal").OneSignal as OneSignalModule;
+  } catch (err) {
+    console.warn(`[onesignal] Native module unavailable on ${Platform.OS}; push disabled for this runtime`);
+    oneSignalModule = null;
+  }
+
+  return oneSignalModule;
+}
 
 const NOTIFICATIONS_ENABLED_KEY = "@puffin_notifications_enabled";
 const ADMIN_NOTIFICATIONS_ENABLED_KEY = "@puffin_admin_notifications_enabled";
@@ -16,9 +37,17 @@ export function initOneSignal(): boolean {
     return false;
   }
 
+  const OneSignal = getOneSignal();
+  if (!OneSignal) return false;
+
   if (!hasInitializedOneSignal) {
-    OneSignal.initialize(ONE_SIGNAL_APP_ID);
-    hasInitializedOneSignal = true;
+    try {
+      OneSignal.initialize(ONE_SIGNAL_APP_ID);
+      hasInitializedOneSignal = true;
+    } catch (err) {
+      console.error("[onesignal] initialization failed", err);
+      return false;
+    }
   }
 
   return true;
@@ -26,6 +55,9 @@ export function initOneSignal(): boolean {
 
 async function requestPushPermission(): Promise<boolean> {
   if (!initOneSignal()) return false;
+
+  const OneSignal = getOneSignal();
+  if (!OneSignal) return false;
 
   try {
     const granted = await OneSignal.Notifications.requestPermission(true);
@@ -40,12 +72,16 @@ async function requestPushPermission(): Promise<boolean> {
 /** Register a callback for notification taps. */
 export function onNotificationTap(callback: () => void): void {
   if (!initOneSignal()) return;
+  const OneSignal = getOneSignal();
+  if (!OneSignal) return;
   OneSignal.Notifications.addEventListener("click", callback);
 }
 
 /** Link an email to this device so the admin can target them via OneSignal REST API. */
 export function linkEmailToPush(email: string): void {
   if (!email.trim() || !initOneSignal()) return;
+  const OneSignal = getOneSignal();
+  if (!OneSignal) return;
   OneSignal.User.addAlias("external_id", email.toLowerCase().trim());
   OneSignal.User.addEmail(email.toLowerCase().trim());
 }
@@ -66,7 +102,8 @@ export async function setNotificationsEnabled(enabled: boolean, email?: string):
   }
 
   await AsyncStorage.setItem(NOTIFICATIONS_ENABLED_KEY, "false");
-  if (initOneSignal()) OneSignal.User.pushSubscription.optOut();
+  const OneSignal = getOneSignal();
+  if (initOneSignal() && OneSignal) OneSignal.User.pushSubscription.optOut();
   return false;
 }
 
@@ -83,7 +120,8 @@ export async function setAdminNotificationsEnabled(enabled: boolean): Promise<bo
     await AsyncStorage.setItem(ADMIN_NOTIFICATIONS_ENABLED_KEY, String(granted));
     if (granted) {
       try {
-        OneSignal.User.addTag(ADMIN_PUSH_TAG, "true");
+        const OneSignal = getOneSignal();
+        if (OneSignal) OneSignal.User.addTag(ADMIN_PUSH_TAG, "true");
       } catch (err) {
         console.error("[onesignal] admin tag failed", err);
       }
@@ -92,6 +130,7 @@ export async function setAdminNotificationsEnabled(enabled: boolean): Promise<bo
   }
 
   await AsyncStorage.setItem(ADMIN_NOTIFICATIONS_ENABLED_KEY, "false");
-  if (initOneSignal()) OneSignal.User.removeTag(ADMIN_PUSH_TAG);
+  const OneSignal = getOneSignal();
+  if (initOneSignal() && OneSignal) OneSignal.User.removeTag(ADMIN_PUSH_TAG);
   return false;
 }
