@@ -9,6 +9,7 @@ import {
   Anchor,
   Calendar,
   CheckCircle,
+  Clock,
   Key,
   Lock,
   LogOut,
@@ -287,6 +288,7 @@ function AdminEditor({
   const [isTrackingBoat, setIsTrackingBoat] = useState<boolean>(false);
   const [trackingError, setTrackingError] = useState<string | null>(null);
   const [pickerDayIdx, setPickerDayIdx] = useState<number | null>(null);
+  const [pickerTimeTarget, setPickerTimeTarget] = useState<{ dayIdx: number; timeIdx: number } | null>(null);
 
   // Scanner state
   const [scannerOpen, setScannerOpen] = useState<boolean>(false);
@@ -403,6 +405,21 @@ function AdminEditor({
     [edited],
   );
 
+  const timeStringToDate = useCallback((time: string): Date => {
+    const [hoursRaw, minutesRaw] = time.split(":");
+    const hours = Number(hoursRaw);
+    const minutes = Number(minutesRaw);
+    const date = new Date();
+    date.setHours(Number.isFinite(hours) ? hours : 10, Number.isFinite(minutes) ? minutes : 0, 0, 0);
+    return date;
+  }, []);
+
+  const formatPickerTime = useCallback((date: Date): string => {
+    const hours = String(date.getHours()).padStart(2, "0");
+    const minutes = String(date.getMinutes()).padStart(2, "0");
+    return `${hours}:${minutes}`;
+  }, []);
+
   const addDay = useCallback(() => {
     if (!edited) return;
     const today = new Date();
@@ -424,6 +441,7 @@ function AdminEditor({
       setEdited({ ...edited, days: edited.days.filter((_, i) => i !== idx) });
       setHasChanges(true);
       setPickerDayIdx(null);
+      setPickerTimeTarget(null);
     },
     [edited],
   );
@@ -1050,13 +1068,45 @@ function AdminEditor({
 
               {d.times.map((t, timeIdx) => (
                 <View key={`${t.time}-${timeIdx}`} style={styles.timeRow}>
-                  <TextInput
-                    value={t.time}
-                    onChangeText={(v) => updateTime(dayIdx, timeIdx, { time: v })}
-                    placeholder="HH:MM"
-                    placeholderTextColor={theme.textMuted}
-                    style={[styles.inlineField, { flex: 0, width: 80 }]}
-                  />
+                  <View style={styles.timePickerColumn}>
+                    <Pressable
+                      onPress={() => setPickerTimeTarget({ dayIdx, timeIdx })}
+                      style={styles.timePickerField}
+                    >
+                      <Clock size={13} color={theme.sea} />
+                      <Text style={styles.timePickerText}>{t.time}</Text>
+                    </Pressable>
+                    {pickerTimeTarget?.dayIdx === dayIdx && pickerTimeTarget.timeIdx === timeIdx && (
+                      <View style={styles.timePickerWrapper}>
+                        <View style={styles.datePickerHeader}>
+                          <Text style={styles.datePickerTitle}>Select Time</Text>
+                          <Pressable onPress={() => setPickerTimeTarget(null)} hitSlop={8}>
+                            <X size={16} color={theme.textMuted} />
+                          </Pressable>
+                        </View>
+                        <DateTimePicker
+                          value={timeStringToDate(t.time)}
+                          mode="time"
+                          display={Platform.OS === "ios" ? "spinner" : "default"}
+                          minuteInterval={5}
+                          themeVariant="light"
+                          onChange={(event: DateTimePickerEvent, selectedDate?: Date) => {
+                            if (Platform.OS === "android") {
+                              setPickerTimeTarget(null);
+                            }
+                            if (event.type === "dismissed") {
+                              setPickerTimeTarget(null);
+                              return;
+                            }
+                            if (selectedDate) {
+                              updateTime(dayIdx, timeIdx, { time: formatPickerTime(selectedDate) });
+                              if (Platform.OS === "ios") setPickerTimeTarget(null);
+                            }
+                          }}
+                        />
+                      </View>
+                    )}
+                  </View>
                   <View style={{ flex: 1, position: "relative" }}>
                     <TextInput
                       value={t.cruiseId}
@@ -1563,6 +1613,34 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 6,
+  },
+  timePickerColumn: {
+    width: 94,
+    gap: 6,
+  },
+  timePickerField: {
+    minHeight: 40,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: theme.white,
+    borderWidth: 1.5,
+    borderColor: theme.sea,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+  },
+  timePickerText: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: theme.text,
+  },
+  timePickerWrapper: {
+    width: 210,
+    backgroundColor: theme.white,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: theme.border,
+    overflow: "hidden",
   },
 
   addBtn: {
