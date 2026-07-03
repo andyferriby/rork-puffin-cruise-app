@@ -353,6 +353,68 @@ function AdminEditor({
     [edited],
   );
 
+  const addCruise = useCallback(() => {
+    if (!edited) return;
+    const newCruise: Cruise = {
+      id: `cruise-${Date.now()}`,
+      name: "New Cruise",
+      duration: "1 hour",
+      description: "",
+      adultPrice: 18,
+      childPrice: 10,
+      capacity: 30,
+      emoji: "⛵",
+    };
+    setEdited({ ...edited, cruises: [...edited.cruises, newCruise] });
+    setHasChanges(true);
+  }, [edited]);
+
+  const removeCruise = useCallback(
+    (idx: number) => {
+      if (!edited) return;
+      const cruise = edited.cruises[idx];
+      if (!cruise) return;
+
+      // Count sailings still referencing this cruise
+      const referenced = edited.days.reduce(
+        (acc, d) => acc + d.times.filter((t) => t.cruiseId === cruise.id).length,
+        0,
+      );
+
+      const doRemove = () => {
+        const cruises = edited.cruises.filter((_, i) => i !== idx);
+        // Clear any sailing times that referenced the removed cruise
+        const days = edited.days.map((d) => ({
+          ...d,
+          times: d.times.filter((t) => t.cruiseId !== cruise.id),
+        }));
+        setEdited({ ...edited, cruises, days });
+        setHasChanges(true);
+      };
+
+      if (referenced > 0) {
+        Alert.alert(
+          "Remove cruise?",
+          "\"" + cruise.name + "\" is used by " + referenced + " sailing" + (referenced === 1 ? "" : "s") + ". Those sailings will also be removed.",
+          [
+            { text: "Cancel", style: "cancel" },
+            { text: "Remove", style: "destructive", onPress: doRemove },
+          ],
+        );
+      } else {
+        Alert.alert(
+          "Remove cruise?",
+          "Remove \"" + cruise.name + "\"? You can add it back later.",
+          [
+            { text: "Cancel", style: "cancel" },
+            { text: "Remove", style: "destructive", onPress: doRemove },
+          ],
+        );
+      }
+    },
+    [edited],
+  );
+
   const updateDay = useCallback(
     (idx: number, patch: Partial<DaySchedule>) => {
       if (!edited) return;
@@ -937,6 +999,12 @@ function AdminEditor({
         <Section title="Cruise Types">
           {edited.cruises.map((c, i) => (
             <View key={c.id} style={styles.cruiseCard}>
+              <View style={styles.cruiseCardHeader}>
+                <Text style={styles.cruiseIdLabel}>ID: {c.id}</Text>
+                <Pressable onPress={() => removeCruise(i)} hitSlop={8} style={styles.cruiseDeleteBtn}>
+                  <Trash2 size={16} color={theme.coral} />
+                </Pressable>
+              </View>
               <TextInput
                 value={c.name}
                 onChangeText={(v) => updateCruise(i, { name: v })}
@@ -989,6 +1057,15 @@ function AdminEditor({
                 </View>
               </View>
               <TextInput
+                value={c.id}
+                onChangeText={(v) => updateCruise(i, { id: v })}
+                placeholder="Cruise ID (used in sailings)"
+                placeholderTextColor={theme.textMuted}
+                autoCapitalize="none"
+                autoCorrect={false}
+                style={[styles.inlineField, { fontSize: 12 }]}
+              />
+              <TextInput
                 value={c.description}
                 onChangeText={(v) => updateCruise(i, { description: v })}
                 placeholder="Short description"
@@ -998,6 +1075,10 @@ function AdminEditor({
               />
             </View>
           ))}
+          <Pressable onPress={addCruise} style={styles.addCruiseBtn}>
+            <Plus size={16} color={theme.sea} />
+            <Text style={styles.addCruiseBtnText}>Add Cruise Type</Text>
+          </Pressable>
         </Section>
 
         {/* Days */}
@@ -1596,6 +1677,35 @@ const styles = StyleSheet.create({
     padding: 12,
     gap: 8,
   },
+  cruiseCardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  cruiseIdLabel: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: theme.textMuted,
+    fontFamily: "monospace",
+  },
+  cruiseDeleteBtn: {
+    padding: 6,
+    borderRadius: 8,
+    backgroundColor: "#FFF3F0",
+  },
+  addCruiseBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 14,
+    borderWidth: 1.5,
+    borderColor: theme.sea,
+    borderRadius: 12,
+    borderStyle: "dashed",
+    marginTop: 4,
+  },
+  addCruiseBtnText: { color: theme.sea, fontWeight: "700", fontSize: 14 },
 
   dayCard: {
     backgroundColor: theme.card,
