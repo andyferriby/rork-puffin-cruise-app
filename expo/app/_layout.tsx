@@ -24,10 +24,6 @@ function RootLayoutNav() {
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="onboarding" options={{ headerShown: false }} />
       <Stack.Screen name="arrival-guide" options={{ presentation: "modal", title: "Arrival Guide" }} />
-      <Stack.Screen
-        name="book/[cruiseId]"
-        options={{ presentation: "modal", title: "Book Cruise" }}
-      />
     </Stack>
   );
 }

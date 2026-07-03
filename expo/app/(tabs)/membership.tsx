@@ -2,13 +2,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Image } from "expo-image";
 import * as Clipboard from "expo-clipboard";
 import { Crown, Gift, QrCode, RefreshCw, ShieldCheck, ShipWheel, ShoppingBag, Ticket } from "lucide-react-native";
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Purchases, { PurchasesPackage } from "react-native-purchases";
 
 import { theme } from "@/constants/theme";
-import { getMembershipCustomerInfo, getMembershipOffering, hasMembership, restoreMembership, syncMembership, type MembershipPass } from "@/lib/membership";
+import { clearMemberPass, getMembershipCustomerInfo, getMembershipOffering, hasMembership, loadMemberEmail, loadMemberPass, restoreMembership, saveMemberEmail, syncMembership, type MembershipPass } from "@/lib/membership";
 
 function qrCodeUrl(memberId: string): string {
   return `https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(`PUFFIN_MEMBER:${memberId}`)}&bgcolor=ffffff&color=0B2A4A`;
@@ -18,6 +18,20 @@ export default function MembershipScreen() {
   const insets = useSafeAreaInsets();
   const qc = useQueryClient();
   const [email, setEmail] = useState<string>("");
+  const [pass, setPass] = useState<MembershipPass | null>(null);
+
+  // Load persisted email + pass on mount so the membership survives restarts.
+  useEffect(() => {
+    void (async () => {
+      const savedEmail = await loadMemberEmail();
+      if (savedEmail) setEmail(savedEmail);
+      const savedPass = await loadMemberPass();
+      if (savedPass) {
+        setPass(savedPass);
+        qc.setQueryData(["membership-pass"], savedPass);
+      }
+    })();
+  }, [qc]);
 
   const offeringQuery = useQuery({ queryKey: ["membership-offering"], queryFn: getMembershipOffering });
   const customerQuery = useQuery({ queryKey: ["membership-customer"], queryFn: getMembershipCustomerInfo });
@@ -26,8 +40,9 @@ export default function MembershipScreen() {
 
   const syncMutation = useMutation({
     mutationFn: () => syncMembership(email),
-    onSuccess: (pass: MembershipPass) => {
-      qc.setQueryData(["membership-pass"], pass);
+    onSuccess: (next: MembershipPass) => {
+      qc.setQueryData(["membership-pass"], next);
+      setPass(next);
       Alert.alert("Membership ready", "Your QR pass is ready to use.");
     },
     onError: () => Alert.alert("Could not sync", "Please check your email and connection, then try again."),
@@ -58,7 +73,19 @@ export default function MembershipScreen() {
     onError: () => Alert.alert("Restore failed", "Please try again."),
   });
 
-  const pass = qc.getQueryData<MembershipPass>(["membership-pass"]);
+  // When membership becomes inactive, clear the persisted pass so the QR hides.
+  useEffect(() => {
+    if (!isActive && pass) {
+      void clearMemberPass();
+      setPass(null);
+    }
+  }, [isActive, pass]);
+
+  const onEmailChange = useCallback((value: string) => {
+    setEmail(value);
+    void saveMemberEmail(value);
+  }, []);
+
   const price = packageToBuy?.product.priceString ?? "£100/year";
 
   return (
@@ -106,7 +133,7 @@ export default function MembershipScreen() {
           <View style={styles.passCard}>
             <Text style={styles.sectionTitle}>Create your QR pass</Text>
             <Text style={styles.helper}>Use the same email you want crew to recognise. Admin scanning will deduct 1 credit.</Text>
-            <TextInput value={email} onChangeText={setEmail} placeholder="Your email" placeholderTextColor={theme.textMuted} autoCapitalize="none" keyboardType="email-address" style={styles.input} />
+            <TextInput value={email} onChangeText={onEmailChange} placeholder="Your email" placeholderTextColor={theme.textMuted} autoCapitalize="none" keyboardType="email-address" style={styles.input} />
             <Pressable onPress={() => syncMutation.mutate()} disabled={!email.trim() || syncMutation.isPending} style={[styles.primaryBtn, (!email.trim() || syncMutation.isPending) && { opacity: 0.55 }]}>
               <Text style={styles.primaryText}>{syncMutation.isPending ? "Creating…" : "Create QR Pass"}</Text>
             </Pressable>

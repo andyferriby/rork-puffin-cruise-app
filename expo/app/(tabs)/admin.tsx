@@ -116,12 +116,13 @@ async function handleBarcodeScan(
       });
       const body = (await res.json()) as MembershipRedeemResult | { error?: string; record?: MembershipRedeemResult };
       if (!res.ok) {
-        const errorText = body.error === "no_credits_remaining"
+        const errBody = body as { error?: string; record?: MembershipRedeemResult };
+        const errorText = errBody.error === "no_credits_remaining"
           ? "This member has no trip credits remaining."
-          : body.error === "membership_inactive"
+          : errBody.error === "membership_inactive"
             ? "This membership is inactive or expired."
             : "Membership pass could not be redeemed.";
-        setMembershipResult("record" in body ? body.record ?? null : null);
+        setMembershipResult(errBody.record ?? null);
         setScannerError(errorText);
         return;
       }

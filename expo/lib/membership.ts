@@ -4,6 +4,8 @@ import Purchases, { CustomerInfo, PurchasesOffering } from "react-native-purchas
 
 const BASE = process.env.EXPO_PUBLIC_RORK_FUNCTIONS_URL ?? "";
 const MEMBER_ID_KEY = "@puffin_member_id";
+const MEMBER_EMAIL_KEY = "@puffin_member_email";
+const MEMBER_PASS_KEY = "@puffin_member_pass";
 const TEST_KEY = "test_SCHOyVPxfMqXbovqKbIDwIqpRgN";
 const IOS_LIVE_KEY = "appl_otLFzRBmUwDxcahJfwKDGkvvLxm";
 const ENTITLEMENT = "membership";
@@ -63,6 +65,48 @@ export type MembershipPass = {
   updatedAt: string;
 };
 
+/** Persist the member email so the membership screen remembers it across restarts. */
+export async function saveMemberEmail(email: string): Promise<void> {
+  const trimmed = email.trim().toLowerCase();
+  if (trimmed) {
+    await AsyncStorage.setItem(MEMBER_EMAIL_KEY, trimmed);
+  } else {
+    await AsyncStorage.removeItem(MEMBER_EMAIL_KEY);
+  }
+}
+
+/** Load the persisted member email (or empty string if none saved). */
+export async function loadMemberEmail(): Promise<string> {
+  return (await AsyncStorage.getItem(MEMBER_EMAIL_KEY)) ?? "";
+}
+
+/** Persist the full membership pass so the QR survives app restarts. */
+export async function saveMemberPass(pass: MembershipPass): Promise<void> {
+  await AsyncStorage.setItem(MEMBER_PASS_KEY, JSON.stringify(pass));
+}
+
+/** Load the persisted membership pass (or null if none saved / expired). */
+export async function loadMemberPass(): Promise<MembershipPass | null> {
+  const raw = await AsyncStorage.getItem(MEMBER_PASS_KEY);
+  if (!raw) return null;
+  try {
+    const pass = JSON.parse(raw) as MembershipPass;
+    if (!pass.active || new Date(pass.expiresAt).getTime() < Date.now()) {
+      await AsyncStorage.removeItem(MEMBER_PASS_KEY);
+      return null;
+    }
+    return pass;
+  } catch {
+    await AsyncStorage.removeItem(MEMBER_PASS_KEY);
+    return null;
+  }
+}
+
+/** Clear the persisted pass (used when membership is no longer active). */
+export async function clearMemberPass(): Promise<void> {
+  await AsyncStorage.removeItem(MEMBER_PASS_KEY);
+}
+
 export async function syncMembership(email: string): Promise<MembershipPass> {
   const memberId = await configureMembershipPurchases();
   const info = await Purchases.getCustomerInfo();
@@ -75,7 +119,10 @@ export async function syncMembership(email: string): Promise<MembershipPass> {
     body: JSON.stringify({ memberId, email: email.trim().toLowerCase(), active, expiresAt }),
   });
   if (!res.ok) throw new Error(await res.text());
-  return (await res.json()) as MembershipPass;
+  const pass = (await res.json()) as MembershipPass;
+  await saveMemberEmail(email);
+  await saveMemberPass(pass);
+  return pass;
 }
 
 export async function restoreMembership(): Promise<CustomerInfo> {
