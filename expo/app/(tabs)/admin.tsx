@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import { BarcodeScanningResult, CameraView, useCameraPermissions } from "expo-camera";
 import * as Haptics from "expo-haptics";
+import { Image } from "expo-image";
 import * as Location from "expo-location";
 import {
   AlertCircle,
@@ -48,6 +49,7 @@ import { fetchBoatLocation, saveBoatLocation, stopBoatTracking, type BoatLocatio
 import { supabase } from "@/lib/supabase";
 
 const ADMIN_PIN_KEY = "@puffin_admin_pin";
+const PREPRINTED_TICKET_QR_VALUE = "PUFFIN_SHOP_TICKET_BOARDING";
 
 type ScannedBooking = {
   id: string;
@@ -82,6 +84,47 @@ type MembershipRedeemResult = {
   discountPercent: number;
 };
 
+type PreprintedBoardingState = {
+  count: number;
+  lastScanAt: string | null;
+};
+
+type PreprintedScanResult = {
+  count: number;
+  scannedAt: string;
+};
+
+function preprintedTicketQrUrl(): string {
+  return `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(PREPRINTED_TICKET_QR_VALUE)}&bgcolor=ffffff&color=0B2A4A`;
+}
+
+async function fetchPreprintedBoarding(): Promise<PreprintedBoardingState> {
+  const { data, error } = await supabase
+    .from("app_config")
+    .select("value")
+    .eq("key", "preprinted_boarding")
+    .maybeSingle();
+  if (error) {
+    console.error("[admin] fetch preprinted boarding", error.message);
+    return { count: 0, lastScanAt: null };
+  }
+  const value = (data?.value ?? {}) as Partial<PreprintedBoardingState>;
+  return {
+    count: typeof value.count === "number" && Number.isFinite(value.count) ? value.count : 0,
+    lastScanAt: typeof value.lastScanAt === "string" ? value.lastScanAt : null,
+  };
+}
+
+async function savePreprintedBoarding(next: PreprintedBoardingState): Promise<void> {
+  const { error } = await supabase
+    .from("app_config")
+    .upsert(
+      { key: "preprinted_boarding", value: next as unknown as Record<string, unknown>, updated_at: new Date().toISOString() },
+      { onConflict: "key" },
+    );
+  if (error) throw error;
+}
+
 async function fetchBoardedBookings(): Promise<BoardedBooking[]> {
   const { data, error } = await supabase
     .from("bookings")
@@ -101,13 +144,25 @@ async function handleBarcodeScan(
   callbacks: {
     setScannedBooking: (b: ScannedBooking | null) => void;
     setMembershipResult: (m: MembershipRedeemResult | null) => void;
+    setPreprintedScanResult: (r: PreprintedScanResult | null) => void;
     setScannerError: (e: string | null) => void;
+    onPreprintedTicketScanned: () => Promise<PreprintedScanResult>;
   },
 ): Promise<void> {
-  const { setScannedBooking, setMembershipResult, setScannerError } = callbacks;
+  const { setScannedBooking, setMembershipResult, setPreprintedScanResult, setScannerError, onPreprintedTicketScanned } = callbacks;
   const scannedValue = data.trim();
   try {
     setMembershipResult(null);
+    setPreprintedScanResult(null);
+    if (scannedValue === PREPRINTED_TICKET_QR_VALUE) {
+      const result = await onPreprintedTicketScanned();
+      setScannedBooking(null);
+      setMembershipResult(null);
+      setPreprintedScanResult(result);
+      setScannerError(null);
+      if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      return;
+    }
     if (scannedValue.startsWith("PUFFIN_MEMBER:")) {
       const res = await fetch(`${BASE}/membership/redeem`, {
         method: "POST",
@@ -127,6 +182,7 @@ async function handleBarcodeScan(
         return;
       }
       setScannedBooking(null);
+      setPreprintedScanResult(null);
       setMembershipResult(body as MembershipRedeemResult);
       setScannerError(null);
       if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -145,6 +201,7 @@ async function handleBarcodeScan(
       return;
     }
     const booking = bookings[0] as ScannedBooking;
+    setPreprintedScanResult(null);
     setScannedBooking(booking);
     setScannerError(null);
     if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -295,8 +352,10 @@ function AdminEditor({
   const [scannerOpen, setScannerOpen] = useState<boolean>(false);
   const [scannedBooking, setScannedBooking] = useState<ScannedBooking | null>(null);
   const [membershipResult, setMembershipResult] = useState<MembershipRedeemResult | null>(null);
+  const [preprintedScanResult, setPreprintedScanResult] = useState<PreprintedScanResult | null>(null);
   const [scannerError, setScannerError] = useState<string | null>(null);
   const [markingBoarded, setMarkingBoarded] = useState<boolean>(false);
+  const [adjustingPreprinted, setAdjustingPreprinted] = useState<boolean>(false);
   const [cameraPerm, requestCameraPerm] = useCameraPermissions();
   const scanLockRef = useRef<boolean>(false);
 
@@ -310,6 +369,15 @@ function AdminEditor({
     staleTime: 10_000,
   });
 
+  const {
+    data: preprintedBoarding = { count: 0, lastScanAt: null },
+    refetch: refetchPreprintedBoarding,
+  } = useQuery({
+    queryKey: ["preprinted-boarding"],
+    queryFn: fetchPreprintedBoarding,
+    staleTime: 5_000,
+  });
+
   const boardedTotals = useMemo(() => {
     let adults = 0;
     let children = 0;
@@ -319,6 +387,37 @@ function AdminEditor({
     }
     return { adults, children };
   }, [boardedBookings]);
+
+  const totalPeopleOnBoard = boardedTotals.adults + boardedTotals.children + preprintedBoarding.count;
+
+  const handlePreprintedTicketScanned = useCallback(async (): Promise<PreprintedScanResult> => {
+    const latest = await fetchPreprintedBoarding();
+    const scannedAt = new Date().toISOString();
+    const next: PreprintedBoardingState = { count: latest.count + 1, lastScanAt: scannedAt };
+    await savePreprintedBoarding(next);
+    qc.setQueryData(["preprinted-boarding"], next);
+    return { count: next.count, scannedAt };
+  }, [qc]);
+
+  const adjustPreprintedBoarding = useCallback(async (delta: number): Promise<void> => {
+    setAdjustingPreprinted(true);
+    try {
+      const latest = await fetchPreprintedBoarding();
+      const nextCount = Math.max(0, latest.count + delta);
+      const next: PreprintedBoardingState = {
+        count: nextCount,
+        lastScanAt: delta > 0 ? new Date().toISOString() : latest.lastScanAt,
+      };
+      await savePreprintedBoarding(next);
+      qc.setQueryData(["preprinted-boarding"], next);
+      if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch (err) {
+      console.error("[admin] adjust preprinted boarding", err);
+      Alert.alert("Counter failed", "Could not update the shop ticket counter. Please try again.");
+    } finally {
+      setAdjustingPreprinted(false);
+    }
+  }, [qc]);
 
   const handleBarcodeScanned = useCallback(
     (result: BarcodeScanningResult) => {
@@ -330,10 +429,12 @@ function AdminEditor({
       handleBarcodeScan(result.data, {
         setScannedBooking,
         setMembershipResult,
+        setPreprintedScanResult,
         setScannerError,
+        onPreprintedTicketScanned: handlePreprintedTicketScanned,
       });
     },
-    [],
+    [handlePreprintedTicketScanned],
   );
 
   useEffect(() => {
@@ -601,7 +702,7 @@ function AdminEditor({
   const handleResetBoarded = useCallback(() => {
     Alert.alert(
       "Reset On Board",
-      `This will clear all ${boardedBookings.length} boarded passengers (${boardedTotals.adults + boardedTotals.children} people) back to "paid" status for the next trip. This cannot be undone.`,
+      `This will clear ${totalPeopleOnBoard} people from the on-board count, including app bookings and shop paper tickets. App bookings will go back to "paid" status. This cannot be undone.`,
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -615,7 +716,10 @@ function AdminEditor({
                 .update({ status: "paid" })
                 .eq("status", "boarded");
               if (error) throw error;
+              await savePreprintedBoarding({ count: 0, lastScanAt: null });
+              qc.setQueryData(["preprinted-boarding"], { count: 0, lastScanAt: null });
               refetchBoarded();
+              refetchPreprintedBoarding();
               if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             } catch (err) {
               console.error("[admin] reset boarded", err);
@@ -627,7 +731,7 @@ function AdminEditor({
         },
       ],
     );
-  }, [boardedBookings, boardedTotals, refetchBoarded]);
+  }, [qc, refetchBoarded, refetchPreprintedBoarding, totalPeopleOnBoard]);
 
   useEffect(() => {
     if (!isTrackingBoat) return;
@@ -704,16 +808,49 @@ function AdminEditor({
         {/* On Board List */}
         <Section title="Currently On Board">
           <View style={styles.onboardCard}>
-            {boardedBookings.length === 0 ? (
+            {boardedBookings.length === 0 && preprintedBoarding.count === 0 ? (
               <View style={styles.onboardEmpty}>
                 <Anchor size={28} color={theme.textMuted} />
                 <Text style={styles.onboardEmptyTitle}>No one on board yet</Text>
                 <Text style={styles.onboardEmptySub}>
-                  Scan and mark tickets as boarded to build the passenger manifest.
+                  Scan app tickets or the fixed shop ticket QR to count people boarding.
                 </Text>
               </View>
             ) : (
               <>
+                {preprintedBoarding.count > 0 && (
+                  <View style={styles.preprintedOnboardRow}>
+                    <View style={styles.onboardRowLeft}>
+                      <Text style={styles.onboardName}>Shop paper tickets</Text>
+                      <Text style={styles.onboardCruise}>
+                        Fixed QR scans{preprintedBoarding.lastScanAt ? ` · last ${new Date(preprintedBoarding.lastScanAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : ""}
+                      </Text>
+                    </View>
+                    <View style={styles.preprintedCounterControls}>
+                      <Pressable
+                        onPress={() => adjustPreprintedBoarding(-1)}
+                        disabled={adjustingPreprinted}
+                        hitSlop={8}
+                        style={styles.preprintedStepButton}
+                      >
+                        <Minus size={14} color={theme.sea} />
+                      </Pressable>
+                      <View style={styles.onboardCountBadge}>
+                        <Users size={11} color={theme.sea} />
+                        <Text style={styles.onboardCountText}>{preprintedBoarding.count}</Text>
+                      </View>
+                      <Pressable
+                        onPress={() => adjustPreprintedBoarding(1)}
+                        disabled={adjustingPreprinted}
+                        hitSlop={8}
+                        style={styles.preprintedStepButton}
+                      >
+                        <Plus size={14} color={theme.sea} />
+                      </Pressable>
+                    </View>
+                  </View>
+                )}
+
                 {boardedBookings.map((b, i) => (
                   <View
                     key={b.id}
@@ -750,7 +887,7 @@ function AdminEditor({
                   <View style={styles.onboardTotalItem}>
                     <Text style={styles.onboardTotalLabel}>Total on board</Text>
                     <Text style={styles.onboardTotalValue}>
-                      {boardedTotals.adults + boardedTotals.children}
+                      {totalPeopleOnBoard}
                     </Text>
                   </View>
                   <View style={styles.onboardTotalSplit}>
@@ -764,6 +901,12 @@ function AdminEditor({
                       <Text style={styles.onboardTotalChipLabel}>Children</Text>
                       <Text style={styles.onboardTotalChipValue}>
                         {boardedTotals.children}
+                      </Text>
+                    </View>
+                    <View style={[styles.onboardTotalChip, styles.onboardTotalChipPaper]}>
+                      <Text style={styles.onboardTotalChipLabel}>Shop tickets</Text>
+                      <Text style={styles.onboardTotalChipValue}>
+                        {preprintedBoarding.count}
                       </Text>
                     </View>
                   </View>
@@ -793,7 +936,24 @@ function AdminEditor({
           </View>
         </Section>
 
-        {/* Meta */}
+        <Section title="Shop Paper Ticket QR">
+          <View style={styles.paperQrCard}>
+            <View style={styles.paperQrHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.paperQrTitle}>Use this one QR on every preprinted ticket</Text>
+                <Text style={styles.paperQrSub}>Each scan adds 1 person to the on-board counter. It does not check whether the ticket is real.</Text>
+              </View>
+              <View style={styles.paperQrImageWrap}>
+                <Image source={{ uri: preprintedTicketQrUrl() }} style={styles.paperQrImage} contentFit="contain" />
+              </View>
+            </View>
+            <View style={styles.paperQrCodeBox}>
+              <Text style={styles.paperQrCodeLabel}>QR VALUE</Text>
+              <Text style={styles.paperQrCodeText}>{PREPRINTED_TICKET_QR_VALUE}</Text>
+            </View>
+          </View>
+        </Section>
+
         {/* Ticket Scanner */}
         <Section title="Ticket Scanner">
           <View style={styles.scannerCard}>
@@ -811,6 +971,7 @@ function AdminEditor({
                   setScannerError(null);
                   setScannedBooking(null);
                   setMembershipResult(null);
+                  setPreprintedScanResult(null);
                   scanLockRef.current = false;
                   setScannerOpen(true);
                 }}
@@ -829,6 +990,7 @@ function AdminEditor({
                       setScannerOpen(false);
                       setScannedBooking(null);
                       setMembershipResult(null);
+                      setPreprintedScanResult(null);
                       scanLockRef.current = false;
                       setScannerError(null);
                     }}
@@ -847,7 +1009,7 @@ function AdminEditor({
                     <View style={styles.scannerFrame} />
                   </View>
                 </View>
-                <Text style={styles.scannerHint}>Point camera at a boarding pass or member QR code</Text>
+                <Text style={styles.scannerHint}>Point camera at a boarding pass, member pass, or shop paper-ticket QR</Text>
               </View>
             )}
 
@@ -855,6 +1017,31 @@ function AdminEditor({
               <View style={styles.scannerErrorRow}>
                 <AlertCircle size={14} color={theme.coral} />
                 <Text style={styles.scannerErrorText}>{scannerError}</Text>
+              </View>
+            )}
+
+            {preprintedScanResult && (
+              <View style={styles.scannedResult}>
+                <View style={styles.scannedStatusRow}>
+                  <CheckCircle size={18} color={theme.sea} />
+                  <Text style={styles.scannedStatusText}>Shop Ticket Counted</Text>
+                </View>
+                <Text style={styles.scannedName}>+1 person on board</Text>
+                <Text style={styles.scannedCruise}>Preprinted shop ticket</Text>
+                <Text style={styles.scannedMeta}>Scanned {new Date(preprintedScanResult.scannedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</Text>
+                <View style={styles.scannedStatusBadge}>
+                  <Text style={styles.scannedStatusBadgeText}>{preprintedScanResult.count} SHOP TICKET{preprintedScanResult.count === 1 ? "" : "S"} ON BOARD</Text>
+                </View>
+                <Pressable
+                  onPress={() => {
+                    setPreprintedScanResult(null);
+                    setScannerError(null);
+                    scanLockRef.current = false;
+                  }}
+                  style={styles.scanAnother}
+                >
+                  <Text style={styles.scanAnotherText}>Scan Another</Text>
+                </Pressable>
               </View>
             )}
 
@@ -874,6 +1061,7 @@ function AdminEditor({
                 <Pressable
                   onPress={() => {
                     setMembershipResult(null);
+                    setPreprintedScanResult(null);
                     setScannerError(null);
                     scanLockRef.current = false;
                   }}
@@ -954,6 +1142,7 @@ function AdminEditor({
                   onPress={() => {
                     setScannedBooking(null);
                     setMembershipResult(null);
+                    setPreprintedScanResult(null);
                     setScannerError(null);
                     scanLockRef.current = false;
                   }}
@@ -1952,6 +2141,60 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: theme.coral,
   },
+  paperQrCard: {
+    backgroundColor: theme.white,
+    borderWidth: 1,
+    borderColor: theme.border,
+    borderRadius: 18,
+    padding: 14,
+    gap: 12,
+  },
+  paperQrHeader: {
+    flexDirection: "row",
+    gap: 14,
+    alignItems: "center",
+  },
+  paperQrTitle: {
+    fontSize: 16,
+    fontWeight: "900",
+    color: theme.text,
+  },
+  paperQrSub: {
+    marginTop: 5,
+    fontSize: 13,
+    lineHeight: 18,
+    color: theme.textMuted,
+  },
+  paperQrImageWrap: {
+    width: 98,
+    height: 98,
+    borderRadius: 16,
+    backgroundColor: theme.foam,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  paperQrImage: {
+    width: 86,
+    height: 86,
+  },
+  paperQrCodeBox: {
+    backgroundColor: theme.bg,
+    borderRadius: 12,
+    padding: 10,
+    gap: 3,
+  },
+  paperQrCodeLabel: {
+    fontSize: 10,
+    fontWeight: "900",
+    color: theme.textMuted,
+    letterSpacing: 0.8,
+  },
+  paperQrCodeText: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: theme.sea,
+    fontFamily: "monospace",
+  },
   boardedButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -2087,6 +2330,32 @@ const styles = StyleSheet.create({
     backgroundColor: theme.border,
     marginVertical: 10,
   },
+  preprintedOnboardRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    gap: 10,
+    backgroundColor: "#F7F2E7",
+    borderRadius: 14,
+    marginBottom: 4,
+  },
+  preprintedCounterControls: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  preprintedStepButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 11,
+    backgroundColor: theme.white,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: theme.border,
+  },
   onboardTotals: {
     gap: 10,
   },
@@ -2123,6 +2392,9 @@ const styles = StyleSheet.create({
   },
   onboardTotalChipAlt: {
     backgroundColor: "#FFF3F0",
+  },
+  onboardTotalChipPaper: {
+    backgroundColor: "#F7F2E7",
   },
   onboardTotalChipLabel: {
     fontSize: 13,
