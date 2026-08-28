@@ -177,13 +177,42 @@ struct PlacesToEatView: View {
     }
 }
 
-/// Detail for a single place: info, call, website and walking directions.
+/// Detail for a single place: info, mini-map, call, website and directions.
 struct PlaceDetailView: View {
     let place: PlaceToEat
     private let favorites = FavoritesStore.shared
 
     private var directionsURL: URL? {
         URL(string: "https://maps.apple.com/?daddr=\(place.latitude),\(place.longitude)&dirflg=w")
+    }
+
+    private var placeCoordinate: CLLocationCoordinate2D {
+        CLLocationCoordinate2D(latitude: place.latitude, longitude: place.longitude)
+    }
+
+    /// Region framing both the place and Amble Harbour so the mini-map
+    /// always shows where the restaurant sits relative to the departure point.
+    private var previewRegion: MKCoordinateRegion {
+        let harbour = CLLocationCoordinate2D(latitude: 55.3338, longitude: -1.5803)
+        let minLat = min(place.latitude, harbour.latitude)
+        let maxLat = max(place.latitude, harbour.latitude)
+        let minLon = min(place.longitude, harbour.longitude)
+        let maxLon = max(place.longitude, harbour.longitude)
+        let center = CLLocationCoordinate2D(latitude: (minLat + maxLat) / 2, longitude: (minLon + maxLon) / 2)
+        return MKCoordinateRegion(
+            center: center,
+            span: MKCoordinateSpan(
+                latitudeDelta: max(maxLat - minLat, 0.0022) * 2.4,
+                longitudeDelta: max(maxLon - minLon, 0.0022) * 2.4
+            )
+        )
+    }
+
+    /// Rough walk time from the harbour at a relaxed ~80 m per minute.
+    private var walkMinutesFromHarbour: Int {
+        let from = CLLocation(latitude: place.latitude, longitude: place.longitude)
+        let harbour = CLLocation(latitude: 55.3338, longitude: -1.5803)
+        return max(1, Int((from.distance(from: harbour) / 80).rounded()))
     }
 
     var body: some View {
@@ -233,6 +262,29 @@ struct PlaceDetailView: View {
                 }
 
                 if let directionsURL {
+                    mapPreview
+                        .frame(height: 170)
+                        .clipShape(.rect(cornerRadius: 18))
+                        .overlay(alignment: .bottomLeading) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "sailboat.fill")
+                                Text("Amble Harbour")
+                                Image(systemName: "figure.walk")
+                                Text("~\(walkMinutesFromHarbour) min walk")
+                            }
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(.black.opacity(0.55))
+                            .clipShape(Capsule())
+                            .padding(8)
+                        }
+                        .contentShape(.rect)
+                        .onTapGesture { UIApplication.shared.open(directionsURL) }
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel("Map showing \(place.name) relative to Amble Harbour. Opens walking directions.")
+
                     Button {
                         UIApplication.shared.open(directionsURL)
                     } label: {
@@ -294,5 +346,16 @@ struct PlaceDetailView: View {
                 .accessibilityLabel(favorites.isFavorite(place) ? "Remove from favourites" : "Add to favourites")
             }
         }
+    }
+
+    /// Mini-map pinning the restaurant against the harbour departure point.
+    private var mapPreview: some View {
+        Map(initialPosition: .region(previewRegion), interactionModes: []) {
+            Marker("Amble Harbour", systemImage: "sailboat.fill", coordinate: CLLocationCoordinate2D(latitude: 55.3338, longitude: -1.5803))
+                .tint(Theme.sea)
+            Marker(place.name, systemImage: "fork.knife", coordinate: placeCoordinate)
+                .tint(Theme.coral)
+        }
+        .mapStyle(.standard(pointsOfInterest: .excludingAll, showsTraffic: false))
     }
 }
