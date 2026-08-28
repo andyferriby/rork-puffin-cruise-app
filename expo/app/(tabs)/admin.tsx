@@ -26,6 +26,7 @@ import {
   ShoppingBag,
   Ticket,
   Trash2,
+  Utensils,
   Users,
   Video,
   X,
@@ -1010,6 +1011,11 @@ function AdminEditor({
           </View>
         </Section>
 
+        {/* Places to Eat */}
+        <Section title="Places to Eat">
+          <PlacesSection />
+        </Section>
+
         {/* Ticket Scanner */}
         <Section title="Ticket Scanner">
           <View style={styles.scannerCard}>
@@ -1889,6 +1895,343 @@ function SendPushSection() {
           {sendingPush ? "Sending..." : "Send to All Devices"}
         </Text>
       </Pressable>
+    </View>
+  );
+}
+
+// ── Places to Eat ───────────────────────────────────────────────────
+
+type PlaceToEat = {
+  id: string;
+  name: string;
+  category: string;
+  blurb: string;
+  info: string;
+  latitude: number;
+  longitude: number;
+  imageURL?: string;
+  phone?: string;
+  website?: string;
+};
+
+async function fetchPlacesToEat(): Promise<PlaceToEat[]> {
+  const { data, error } = await supabase
+    .from("app_config")
+    .select("value")
+    .eq("key", "places_to_eat")
+    .maybeSingle();
+  if (error) {
+    console.error("[admin] fetch places", error.message);
+    return [];
+  }
+  const value = data?.value;
+  if (!Array.isArray(value)) return [];
+  return value.filter((p: unknown) => !!p && typeof (p as PlaceToEat).name === "string") as PlaceToEat[];
+}
+
+async function savePlacesToEat(places: PlaceToEat[]): Promise<void> {
+  const { error } = await supabase
+    .from("app_config")
+    .upsert(
+      { key: "places_to_eat", value: places as unknown as Record<string, unknown>, updated_at: new Date().toISOString() },
+      { onConflict: "key" },
+    );
+  if (error) throw error;
+}
+
+const EMPTY_PLACE_FORM = {
+  name: "",
+  category: "",
+  blurb: "",
+  info: "",
+  latitude: "",
+  longitude: "",
+  imageURL: "",
+  phone: "",
+  website: "",
+};
+
+type PlaceFormState = typeof EMPTY_PLACE_FORM;
+
+const placeStyles = {
+  card: {
+    backgroundColor: theme.white,
+    borderRadius: 14,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: theme.border,
+    gap: 10,
+  },
+  row: { flexDirection: "row" as const, alignItems: "center" as const, gap: 10 },
+  name: { fontSize: 15, fontWeight: "800", color: theme.text },
+  category: { fontSize: 11, fontWeight: "700", color: theme.sea, letterSpacing: 0.6 },
+  blurb: { fontSize: 12.5, color: theme.textMuted, marginTop: 2 },
+  smallBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: theme.foam,
+  },
+  smallBtnText: { fontSize: 12, fontWeight: "800", color: theme.sea },
+  iconBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: theme.foam,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+  },
+  label: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: theme.textMuted,
+    marginBottom: 4,
+    textTransform: "uppercase" as const,
+    letterSpacing: 0.5,
+  },
+  input: {
+    backgroundColor: theme.bg,
+    borderWidth: 1,
+    borderColor: theme.border,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: theme.text,
+  },
+  textarea: { height: 80, textAlignVertical: "top" as const },
+  addBtn: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    gap: 8,
+    backgroundColor: theme.sea,
+    paddingVertical: 13,
+    borderRadius: 14,
+  },
+  addBtnText: { fontSize: 14, fontWeight: "800", color: theme.white },
+  saveBtn: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    gap: 8,
+    backgroundColor: theme.coral,
+    paddingVertical: 14,
+    borderRadius: 14,
+  },
+  saveBtnText: { fontSize: 14, fontWeight: "800", color: theme.white },
+  preview: {
+    width: 56,
+    height: 56,
+    borderRadius: 12,
+    backgroundColor: theme.foam,
+  },
+  errorText: { color: theme.coral, fontSize: 12.5, fontWeight: "600" },
+};
+
+function PlacesSection() {
+  const qc = useQueryClient();
+  const { data: places, isLoading } = useQuery({
+    queryKey: ["places-to-eat"],
+    queryFn: fetchPlacesToEat,
+  });
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [form, setForm] = useState<PlaceFormState>({ ...EMPTY_PLACE_FORM });
+  const [showForm, setShowForm] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const setField = (key: keyof PlaceFormState, value: string) =>
+    setForm((prev) => ({ ...prev, [key]: value }));
+
+  const startAdd = () => {
+    setEditingId(null);
+    setForm({ ...EMPTY_PLACE_FORM });
+    setShowForm(true);
+    setFormError(null);
+  };
+
+  const startEdit = (place: PlaceToEat) => {
+    setEditingId(place.id);
+    setForm({
+      name: place.name,
+      category: place.category ?? "",
+      blurb: place.blurb ?? "",
+      info: place.info ?? "",
+      latitude: String(place.latitude ?? ""),
+      longitude: String(place.longitude ?? ""),
+      imageURL: place.imageURL ?? "",
+      phone: place.phone ?? "",
+      website: place.website ?? "",
+    });
+    setShowForm(true);
+    setFormError(null);
+  };
+
+  const handleSave = async () => {
+    if (!form.name.trim()) {
+      setFormError("A name is needed.");
+      return;
+    }
+    const lat = Number(form.latitude);
+    const lng = Number(form.longitude);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+      setFormError("Latitude must be -90..90 and longitude -180..180.");
+      return;
+    }
+    setSaving(true);
+    setFormError(null);
+    try {
+      const current = places ?? [];
+      const next: PlaceToEat = {
+        id: editingId ?? `place-${Date.now().toString(36)}`,
+        name: form.name.trim(),
+        category: form.category.trim(),
+        blurb: form.blurb.trim(),
+        info: form.info.trim(),
+        latitude: lat,
+        longitude: lng,
+        imageURL: form.imageURL.trim() || undefined,
+        phone: form.phone.trim() || undefined,
+        website: form.website.trim() || undefined,
+      };
+      const updated = editingId
+        ? current.map((p) => (p.id === editingId ? next : p))
+        : [...current, next];
+      await savePlacesToEat(updated);
+      qc.invalidateQueries({ queryKey: ["places-to-eat"] });
+      setShowForm(false);
+      setEditingId(null);
+      setForm({ ...EMPTY_PLACE_FORM });
+      if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (err) {
+      console.error("[admin] save places", err);
+      setFormError("Could not save. Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = (id: string) => {
+    Alert.alert("Remove place?", "This will remove it from the customer apps.", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Remove",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            const updated = (places ?? []).filter((p) => p.id !== id);
+            await savePlacesToEat(updated);
+            qc.invalidateQueries({ queryKey: ["places-to-eat"] });
+          } catch (err) {
+            console.error("[admin] delete place", err);
+          }
+        },
+      },
+    ]);
+  };
+
+  const field = (label: string, key: keyof PlaceFormState, extra?: { multiline?: boolean; placeholder?: string; keyboardType?: "default" | "numbers-and-punctuation" | "url" | "phone-pad" }) => (
+    <View key={key}>
+      <Text style={placeStyles.label}>{label}</Text>
+      <TextInput
+        style={[placeStyles.input, extra?.multiline && placeStyles.textarea]}
+        value={form[key]}
+        onChangeText={(value) => setField(key, value)}
+        placeholder={extra?.placeholder}
+        placeholderTextColor={theme.textMuted}
+        multiline={extra?.multiline}
+        keyboardType={extra?.keyboardType}
+        autoCapitalize={key === "imageURL" || key === "website" ? "none" : "sentences"}
+      />
+    </View>
+  );
+
+  return (
+    <View style={{ gap: 12 }}>
+      {isLoading ? (
+        <ActivityIndicator color={theme.sea} size="small" />
+      ) : (
+        <>
+          {(places ?? []).map((place) => (
+            <View key={place.id} style={placeStyles.card}>
+              <View style={placeStyles.row}>
+                <View style={{ flex: 1 }}>
+                  {place.category ? <Text style={placeStyles.category}>{place.category.toUpperCase()}</Text> : null}
+                  <Text style={placeStyles.name}>{place.name}</Text>
+                  {place.blurb ? <Text style={placeStyles.blurb}>{place.blurb}</Text> : null}
+                </View>
+                {place.imageURL ? (
+                  <Image source={{ uri: place.imageURL }} style={placeStyles.preview} contentFit="cover" />
+                ) : null}
+              </View>
+              <View style={placeStyles.row}>
+                <Pressable style={placeStyles.smallBtn} onPress={() => startEdit(place)} hitSlop={6}>
+                  <Text style={placeStyles.smallBtnText}>Edit</Text>
+                </Pressable>
+                <Pressable style={placeStyles.iconBtn} onPress={() => handleDelete(place.id)} hitSlop={6}>
+                  <Trash2 size={16} color={theme.coral} />
+                </Pressable>
+                <Text style={{ fontSize: 11, color: theme.textMuted, flex: 1 }}>
+                  {place.latitude.toFixed(4)}, {place.longitude.toFixed(4)}
+                </Text>
+              </View>
+            </View>
+          ))}
+          {(places ?? []).length === 0 ? (
+            <Text style={{ fontSize: 12.5, color: theme.textMuted }}>
+              No places yet. Add fish and chips, cafés and pubs around the harbour.
+            </Text>
+          ) : null}
+        </>
+      )}
+
+      {!showForm ? (
+        <Pressable style={placeStyles.addBtn} onPress={startAdd}>
+          <Plus size={16} color={theme.white} />
+          <Text style={placeStyles.addBtnText}>Add a Place</Text>
+        </Pressable>
+      ) : (
+        <View style={[placeStyles.card, { borderWidth: 1.5, borderColor: theme.sea }]}>
+          <Text style={{ fontSize: 14, fontWeight: "800", color: theme.text }}>
+            {editingId ? "Edit place" : "New place"}
+          </Text>
+          {field("Name", "name", { placeholder: "The Harbour Chippy" })}
+          {field("Category", "category", { placeholder: "Fish & chips, café, pub…" })}
+          {field("Short blurb", "blurb", { placeholder: "One line shown in the list" })}
+          {field("Details", "info", { multiline: true, placeholder: "Opening hours, what to order…" })}
+          {field("Latitude", "latitude", { placeholder: "55.3338", keyboardType: "numbers-and-punctuation" })}
+          {field("Longitude", "longitude", { placeholder: "-1.5803", keyboardType: "numbers-and-punctuation" })}
+          {field("Picture URL", "imageURL", { placeholder: "https://…" })}
+          {field("Phone", "phone", { placeholder: "01665 000000", keyboardType: "phone-pad" })}
+          {field("Website", "website", { placeholder: "https://…", keyboardType: "url" })}
+          {formError ? <Text style={placeStyles.errorText}>{formError}</Text> : null}
+          <Pressable
+            style={[placeStyles.saveBtn, saving && { opacity: 0.6 }]}
+            onPress={handleSave}
+            disabled={saving}
+          >
+            {saving ? (
+              <ActivityIndicator color={theme.white} size="small" />
+            ) : (
+              <Save size={16} color={theme.white} />
+            )}
+            <Text style={placeStyles.saveBtnText}>{saving ? "Saving…" : "Save Place"}</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => {
+              setShowForm(false);
+              setEditingId(null);
+              setFormError(null);
+            }}
+            hitSlop={6}
+          >
+            <Text style={{ fontSize: 13, fontWeight: "700", color: theme.textMuted, textAlign: "center" }}>
+              Cancel
+            </Text>
+          </Pressable>
+        </View>
+      )}
     </View>
   );
 }

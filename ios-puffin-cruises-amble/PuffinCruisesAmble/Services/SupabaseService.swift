@@ -161,6 +161,15 @@ enum SupabaseService {
         }
     }
 
+    static func fetchPlacesToEat() async -> [PlaceToEat] {
+        do {
+            return try await appConfig([PlaceToEat].self, key: "places_to_eat") ?? []
+        } catch {
+            print("[places] fetch failed: \(error.localizedDescription)")
+            return []
+        }
+    }
+
     static func fetchPreprintedBoarding() async -> PreprintedBoarding {
         do {
             return try await appConfig(PreprintedBoarding.self, key: "preprinted_boarding")

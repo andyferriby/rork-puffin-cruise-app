@@ -22,10 +22,13 @@ struct MoreView: View {
             MoreItem(id: "tickets", label: "My Tickets", desc: "View your boarding passes", icon: "ticket.fill", tint: Theme.coral),
             MoreItem(id: "trip", label: "Live Trip", desc: "Follow the boat in real time", icon: "safari.fill", tint: Theme.wave),
             MoreItem(id: "map", label: "Map", desc: "Find us at Amble Harbour", icon: "map.fill", tint: Theme.sea),
-            MoreItem(id: "cameras", label: "Live Cameras", desc: "See the harbour right now", icon: "video.fill", tint: Theme.puffin)
+            MoreItem(id: "cameras", label: "Live Cameras", desc: "See the harbour right now", icon: "video.fill", tint: Theme.puffin),
+            MoreItem(id: "places", label: "Places to Eat", desc: "Food and drink around the harbour", icon: "fork.knife", tint: Theme.coral)
         ]),
         MoreSection(id: "explore", title: "Explore", items: [
             MoreItem(id: "wildlife", label: "Wildlife", desc: "Puffins, seals and more", icon: "bird.fill", tint: Theme.sandDeep),
+            MoreItem(id: "stories", label: "Talking Harbour", desc: "Four stories told as you walk", icon: "waveform", tint: Theme.puffin),
+            MoreItem(id: "secrets", label: "Coast Secrets", desc: "Tide-aware tips and golden hour", icon: "sparkles.rectangle.stack", tint: Theme.wave),
             MoreItem(id: "gallery", label: "Gallery", desc: "Photos from the water", icon: "photo.on.rectangle.angled", tint: Theme.sea),
             MoreItem(id: "shop", label: "Shop", desc: "Gifts and merchandise", icon: "bag.fill", tint: Theme.coral)
         ]),
@@ -120,7 +123,10 @@ struct MoreView: View {
         case "trip": TripView()
         case "map": HarbourMapView()
         case "cameras": CamerasView()
+        case "places": PlacesToEatView()
         case "wildlife": WildlifeView()
+        case "stories": TalkingHarbourView()
+        case "secrets": CoastSecretsView()
         case "gallery": GalleryView()
         case "shop": ShopView()
         case "profile": ProfileView()

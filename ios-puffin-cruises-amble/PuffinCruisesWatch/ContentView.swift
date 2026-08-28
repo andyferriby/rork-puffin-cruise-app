@@ -106,6 +106,7 @@ struct ContentView: View {
 
             pageLink(destination: TidePage(), icon: "water.waves", label: "Live Tides", tint: WatchTheme.mint)
             pageLink(destination: BoatPage(), icon: "location.fill", label: "Boat Tracker", tint: WatchTheme.gold)
+            pageLink(destination: PlacesPage(), icon: "fork.knife", label: "Places to Eat", tint: WatchTheme.mint)
             pageLink(destination: WalkPage(), icon: "figure.walk", label: "Harbour Walk", tint: WatchTheme.mint)
             pageLink(destination: WildlifePage(), icon: "sparkles", label: "Wildlife Spotter", tint: WatchTheme.gold)
         }

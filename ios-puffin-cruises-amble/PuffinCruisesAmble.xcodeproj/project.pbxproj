@@ -580,6 +580,8 @@
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Scan QR codes on boarding passes to check in passengers.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Share your cruise photos to the guest gallery.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "The Talking Harbour walk uses your location to tell each story as you pass it.";
+				INFOPLIST_KEY_UIBackgroundModes = audio;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -616,6 +618,8 @@
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Scan QR codes on boarding passes to check in passengers.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Share your cruise photos to the guest gallery.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "The Talking Harbour walk uses your location to tell each story as you pass it.";
+				INFOPLIST_KEY_UIBackgroundModes = audio;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;

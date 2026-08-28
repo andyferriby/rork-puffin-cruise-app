@@ -36,6 +36,8 @@ struct HomeView: View {
 
                     ctaRow.padding(.top, 24)
 
+                    coastSecretsCard.padding(.top, 20)
+
                     if let notice = schedule.config.notice, !notice.isEmpty {
                         Text("⚓️ \(notice)")
                             .font(.system(size: 13))
@@ -53,7 +55,13 @@ struct HomeView: View {
             }
             .background(Theme.bg)
             .ignoresSafeArea(edges: .top)
-            .navigationDestination(for: String.self) { _ in BookView() }
+            .navigationDestination(for: String.self) { value in
+                if value == "coast-secrets" {
+                    CoastSecretsView()
+                } else {
+                    BookView()
+                }
+            }
             .refreshable { await schedule.load(force: true) }
         }
     }
@@ -242,6 +250,45 @@ struct HomeView: View {
                 .overlay { RoundedRectangle(cornerRadius: 14).stroke(Theme.sea, lineWidth: 1.5) }
             }
         }
+        .padding(.horizontal, 16)
+    }
+
+    // MARK: - Coast Secrets
+
+    private var coastSecretsCard: some View {
+        NavigationLink(value: "coast-secrets") {
+            HStack(spacing: 14) {
+                Image(systemName: "sparkles.rectangle.stack.fill")
+                    .font(.system(size: 24))
+                    .foregroundStyle(Theme.sandDeep)
+                    .frame(width: 52, height: 52)
+                    .background(Theme.sand.opacity(0.5))
+                    .clipShape(.rect(cornerRadius: 14))
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("COAST SECRETS")
+                        .font(.system(size: 10, weight: .heavy))
+                        .tracking(1)
+                        .foregroundStyle(Theme.sandDeep)
+                    Text("Only in Amble")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundStyle(Theme.text)
+                    Text("Tide-aware tips for the shore — and tonight's golden hour photo spot")
+                        .font(.system(size: 12.5))
+                        .foregroundStyle(Theme.textMuted)
+                        .multilineTextAlignment(.leading)
+                        .lineLimit(2)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Theme.textMuted)
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .puffinCard(radius: 18, fill: .white)
+        }
+        .buttonStyle(.plain)
         .padding(.horizontal, 16)
     }
 
