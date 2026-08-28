@@ -219,21 +219,7 @@ struct PlaceDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 if let imageURL = place.imageURL, let url = URL(string: imageURL) {
-                    Color(Theme.foam)
-                        .frame(height: 200)
-                        .overlay {
-                            AsyncImage(url: url) { phase in
-                                switch phase {
-                                case .success(let image):
-                                    image.resizable().aspectRatio(contentMode: .fill).allowsHitTesting(false)
-                                default:
-                                    Image(systemName: "fork.knife")
-                                        .font(.system(size: 36))
-                                        .foregroundStyle(Theme.sea)
-                                }
-                            }
-                        }
-                        .clipShape(.rect(cornerRadius: 18))
+                    heroImage(url)
                 }
 
                 VStack(alignment: .leading, spacing: 4) {
@@ -346,6 +332,29 @@ struct PlaceDetailView: View {
                 .accessibilityLabel(favorites.isFavorite(place) ? "Remove from favourites" : "Add to favourites")
             }
         }
+    }
+
+    /// Banner picture. "Fill" crops a landscape photo to the wide strip;
+    /// "Whole image" letterboxes it so logos and portrait shots stay complete.
+    private func heroImage(_ url: URL) -> some View {
+        Color(Theme.foam)
+            .frame(height: 200)
+            .overlay {
+                AsyncImage(url: url) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: place.displaysWholeImage ? .fit : .fill)
+                            .allowsHitTesting(false)
+                    default:
+                        Image(systemName: "fork.knife")
+                            .font(.system(size: 36))
+                            .foregroundStyle(Theme.sea)
+                    }
+                }
+            }
+            .clipShape(.rect(cornerRadius: 18))
     }
 
     /// Mini-map pinning the restaurant against the harbour departure point.

@@ -121,6 +121,7 @@ private struct PlaceFormSheet: View {
     @State private var blurb = ""
     @State private var info = ""
     @State private var imageURL = ""
+    @State private var showsWholeImage = false
     @State private var phone = ""
     @State private var website = ""
     @State private var latitudeText = ""
@@ -141,15 +142,25 @@ private struct PlaceFormSheet: View {
                         .lineLimit(3...6)
                 }
 
-                Section("Links") {
+                Section {
                     TextField("Picture URL (https://…)", text: $imageURL)
                         .keyboardType(.URL)
                         .textInputAutocapitalization(.never)
+                    if !imageURL.trimmingCharacters(in: .whitespaces).isEmpty {
+                        Picker("Banner display", selection: $showsWholeImage) {
+                            Text("Fill banner (crops)").tag(false)
+                            Text("Whole image (fits)").tag(true)
+                        }
+                    }
                     TextField("Phone (e.g. 01665 710 000)", text: $phone)
                         .keyboardType(.phonePad)
                     TextField("Website (https://…)", text: $website)
                         .keyboardType(.URL)
                         .textInputAutocapitalization(.never)
+                } header: {
+                    Text("Links")
+                } footer: {
+                    Text("Best size for the banner: 1200 × 800 px, landscape. Fill banner crops the picture to a wide strip; Whole image shows it uncropped — best for logos or portrait photos.")
                 }
 
                 Section {
@@ -192,6 +203,7 @@ private struct PlaceFormSheet: View {
         blurb = place.blurb
         info = place.info
         imageURL = place.imageURL ?? ""
+        showsWholeImage = place.displaysWholeImage
         phone = place.phone ?? ""
         website = place.website ?? ""
         latitudeText = String(place.latitude)
@@ -223,7 +235,8 @@ private struct PlaceFormSheet: View {
             longitude: longitude,
             imageURL: cleanedImage.isEmpty ? nil : cleanedImage,
             phone: phone.trimmingCharacters(in: .whitespaces).isEmpty ? nil : phone.trimmingCharacters(in: .whitespaces),
-            website: cleanedWebsite.isEmpty ? nil : cleanedWebsite
+            website: cleanedWebsite.isEmpty ? nil : cleanedWebsite,
+            imageFit: cleanedImage.isEmpty ? nil : (showsWholeImage ? "fit" : "fill")
         )
         onSave(saved)
         dismiss()

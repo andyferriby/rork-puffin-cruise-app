@@ -24,21 +24,24 @@ struct PlacesPage: View {
                         NavigationLink {
                             PlaceDetailPage(place: place)
                         } label: {
-                            VStack(alignment: .leading, spacing: 3) {
-                                if let category = place.category, !category.isEmpty {
-                                    Text(category.uppercased())
-                                        .font(.system(size: 9, weight: .bold))
-                                        .foregroundStyle(WatchTheme.gold)
-                                }
-                                Text(place.name)
-                                    .font(.system(size: 14, weight: .bold))
-                                    .foregroundStyle(.white)
-                                if let blurb = place.blurb, !blurb.isEmpty {
-                                    Text(blurb)
-                                        .font(.system(size: 11))
-                                        .foregroundStyle(.white.opacity(0.7))
-                                        .lineLimit(2)
-                                        .multilineTextAlignment(.leading)
+                            HStack(alignment: .center, spacing: 6) {
+                                placeThumbnail(place)
+                                VStack(alignment: .leading, spacing: 3) {
+                                    if let category = place.category, !category.isEmpty {
+                                        Text(category.uppercased())
+                                            .font(.system(size: 9, weight: .bold))
+                                            .foregroundStyle(WatchTheme.gold)
+                                    }
+                                    Text(place.name)
+                                        .font(.system(size: 14, weight: .bold))
+                                        .foregroundStyle(.white)
+                                    if let blurb = place.blurb, !blurb.isEmpty {
+                                        Text(blurb)
+                                            .font(.system(size: 11))
+                                            .foregroundStyle(.white.opacity(0.7))
+                                            .lineLimit(2)
+                                            .multilineTextAlignment(.leading)
+                                    }
                                 }
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -59,6 +62,28 @@ struct PlacesPage: View {
             places = await WatchPlacesService.fetchPlaces()
         }
     }
+
+    /// Small rounded photo in the listing row; falls back to a cutlery glyph.
+    @ViewBuilder
+    private func placeThumbnail(_ place: WatchPlace) -> some View {
+        if let urlString = place.imageURL, let url = URL(string: urlString) {
+            Color.white.opacity(0.12)
+                .frame(width: 36, height: 36)
+                .overlay {
+                    AsyncImage(url: url) { phase in
+                        switch phase {
+                        case .success(let image):
+                            image.resizable().aspectRatio(contentMode: .fill).allowsHitTesting(false)
+                        default:
+                            Image(systemName: "fork.knife")
+                                .font(.system(size: 13, weight: .bold))
+                                .foregroundStyle(WatchTheme.gold)
+                        }
+                    }
+                }
+                .clipShape(.rect(cornerRadius: 9))
+        }
+    }
 }
 
 private struct PlaceDetailPage: View {
@@ -68,6 +93,23 @@ private struct PlaceDetailPage: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 8) {
                 WatchPageHeader(icon: "fork.knife", title: place.name)
+                if let urlString = place.imageURL, let url = URL(string: urlString) {
+                    Color.white.opacity(0.1)
+                        .frame(height: 70)
+                        .overlay {
+                            AsyncImage(url: url) { phase in
+                                switch phase {
+                                case .success(let image):
+                                    image.resizable().aspectRatio(contentMode: .fill).allowsHitTesting(false)
+                                default:
+                                    Image(systemName: "fork.knife")
+                                        .font(.system(size: 20, weight: .bold))
+                                        .foregroundStyle(WatchTheme.gold)
+                                }
+                            }
+                        }
+                        .clipShape(.rect(cornerRadius: 12))
+                }
                 if let blurb = place.blurb, !blurb.isEmpty {
                     Text(blurb)
                         .font(.system(size: 12, weight: .semibold))
