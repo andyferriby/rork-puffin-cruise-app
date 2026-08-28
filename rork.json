@@ -15,6 +15,11 @@
       "name": "Backend",
       "path": "backend",
       "framework": "supabase"
+    },
+    {
+      "name": "Puffin Cruises Amble",
+      "path": "ios-puffin-cruises-amble",
+      "framework": "swift"
     }
   ]
 }
