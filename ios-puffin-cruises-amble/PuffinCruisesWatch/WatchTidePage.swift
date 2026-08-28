@@ -109,6 +109,19 @@ struct TidePage: View {
                 Text("NEXT \(tide.label.uppercased()) TIDE")
                     .font(.system(size: 10, weight: .bold))
                     .foregroundStyle(.white.opacity(0.55))
+                Spacer(minLength: 0)
+                // Next event is high water -> the tide is rising right now.
+                HStack(spacing: 2) {
+                    Image(systemName: tide.isHigh ? "arrow.up" : "arrow.down")
+                        .font(.system(size: 10, weight: .black))
+                        .symbolEffect(.bounce, options: .repeating)
+                    Text(tide.isHigh ? "Rising" : "Falling")
+                        .font(.system(size: 10, weight: .bold))
+                }
+                .foregroundStyle(tide.isHigh ? WatchTheme.mint : .cyan)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 3)
+                .background(Capsule().fill((tide.isHigh ? WatchTheme.mint : .cyan).opacity(0.16)))
             }
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Text(TideFetch.timeString(tide.date))
