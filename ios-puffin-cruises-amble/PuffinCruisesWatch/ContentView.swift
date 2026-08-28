@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ContentView: View {
     @State private var model = WatchScheduleModel()
+    @State private var goldenHour = GoldenHourModel()
 
     var body: some View {
         NavigationStack {
@@ -10,6 +11,7 @@ struct ContentView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 8) {
                         nextSailingCard
+                        goldenHourCard
                         todaysSailingsCard
                         exploreLinks
                     }
@@ -17,8 +19,14 @@ struct ContentView: View {
                 }
             }
             .navigationTitle("Puffin Cruises")
-            .task { await model.load() }
-            .refreshable { await model.load() }
+            .task {
+                await model.load()
+                await goldenHour.load()
+            }
+            .refreshable {
+                await model.load()
+                await goldenHour.load()
+            }
         }
     }
 
@@ -63,6 +71,41 @@ struct ContentView: View {
                 title: "No more sailings today",
                 detail: "See you tomorrow!"
             )
+        }
+    }
+
+    // MARK: - Golden hour
+
+    @ViewBuilder
+    private var goldenHourCard: some View {
+        if let date = goldenHour.goldenHour {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 5) {
+                    Image(systemName: "camera.aperture")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(WatchTheme.gold)
+                    Text("GOLDEN HOUR")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(.white.opacity(0.55))
+                    Spacer(minLength: 0)
+                }
+
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text(date, style: .time)
+                        .font(.system(size: 22, weight: .heavy, design: .rounded))
+                        .foregroundStyle(WatchTheme.gold)
+                    Text(date, style: .relative)
+                        .font(.system(size: 11, weight: .bold, design: .monospaced))
+                        .foregroundStyle(WatchTheme.mint)
+                }
+
+                Text("The 40 minutes before sunset — best light for harbour photos.")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.white.opacity(0.55))
+                    .lineLimit(2)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .watchCard()
         }
     }
 

@@ -1,3 +1,4 @@
+import Charts
 import SwiftUI
 import UserNotifications
 import WidgetKit
@@ -5,6 +6,7 @@ import WidgetKit
 @MainActor
 @Observable
 final class TideModel {
+    private(set) var series: [TidePoint] = []
     private(set) var all: [TideEvent] = []
     private(set) var upcoming: [TideEvent] = []
     private(set) var isLoading = false
@@ -15,6 +17,13 @@ final class TideModel {
     /// The most recent extreme that has already passed — used for tide momentum.
     var previous: TideEvent? { all.last { $0.date <= Date() } }
 
+    /// Hourly sea level for the next 24 hours — drawn as the tide curve.
+    var curve: [TidePoint] {
+        let start = Date().addingTimeInterval(-3600)
+        let end = Date().addingTimeInterval(24 * 3600)
+        return series.filter { $0.date > start && $0.date < end }
+    }
+
     var todaysTides: [TideEvent] {
         let calendar = Calendar.current
         return upcoming.filter { calendar.isDateInToday($0.date) }
@@ -23,8 +32,10 @@ final class TideModel {
     func load() async {
         isLoading = true
         defer { isLoading = false }
-        let events = await TideFetch.fetchEvents()
-        loadFailed = events.isEmpty
+        let points = await TideFetch.fetchSeries()
+        loadFailed = points.isEmpty
+        series = points
+        let events = TideFetch.events(from: points)
         all = events
         upcoming = events.filter { $0.date > Date().addingTimeInterval(-600) }
         // Keep the complication and Smart Stack card in sync.
@@ -87,6 +98,7 @@ struct TidePage: View {
                 } else if let tide = model.next {
                     nextTideCard(tide)
                     momentumCard
+                    tideCurveCard
                     todaysCard
                 }
                 alertsCard
@@ -189,6 +201,48 @@ struct TidePage: View {
             .watchCard()
             .animation(.easeInOut(duration: 0.5), value: momentum.fraction)
         }
+    }
+
+    /// 24-hour sea-level curve with a gold "now" marker.
+    private var tideCurveCard: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("NEXT 24 HOURS")
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(.white.opacity(0.55))
+
+            Chart {
+                ForEach(model.curve) { point in
+                    LineMark(
+                        x: .value("Time", point.date),
+                        y: .value("Level", point.height)
+                    )
+                    .interpolationMethod(.catmullRom)
+                    .foregroundStyle(LinearGradient(
+                        colors: [.cyan, WatchTheme.gold],
+                        startPoint: .init(x: 0.5, y: 0),
+                        endPoint: .init(x: 0.5, y: 1)
+                    ))
+                    .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round))
+                }
+                RuleMark(x: .value("Now", Date()))
+                    .foregroundStyle(WatchTheme.gold.opacity(0.7))
+                    .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3]))
+            }
+            .chartXAxis {
+                AxisMarks(values: .stride(by: .hour, count: 6)) {
+                    AxisValueLabel(format: .dateTime.hour())
+                        .font(.system(size: 8, weight: .semibold))
+                }
+            }
+            .chartYAxis(.hidden)
+            .frame(height: 72)
+
+            Text("Sea level at Amble Harbour")
+                .font(.system(size: 9))
+                .foregroundStyle(.white.opacity(0.4))
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .watchCard()
     }
 
     @ViewBuilder

@@ -10,6 +10,13 @@ nonisolated struct TideEvent: Identifiable, Hashable {
     var symbolName: String { isHigh ? "arrow.up.to.line" : "arrow.down.to.line" }
 }
 
+nonisolated struct TidePoint: Identifiable, Hashable {
+    let date: Date
+    let height: Double
+
+    var id: Date { date }
+}
+
 /// Fetches tide data for Amble Harbour from Open-Meteo's free marine API
 /// (hourly sea level including tides) and derives high/low water events.
 nonisolated enum TideFetch {
@@ -17,7 +24,8 @@ nonisolated enum TideFetch {
     private static let ambleLatitude = "55.3338"
     private static let ambleLongitude = "-1.5803"
 
-    static func fetchEvents() async -> [TideEvent] {
+    /// Fetches the raw hourly sea-level series (used by the tide curve chart).
+    static func fetchSeries() async -> [TidePoint] {
         guard var components = URLComponents(string: baseURL) else { return [] }
         components.queryItems = [
             URLQueryItem(name: "latitude", value: ambleLatitude),
@@ -39,11 +47,42 @@ nonisolated enum TideFetch {
                 let hourly: Hourly
             }
             let decoded = try JSONDecoder().decode(Response.self, from: data)
-            return parse(times: decoded.hourly.time, heights: decoded.hourly.sea_level_height_msl)
+            let formatter = DateFormatter()
+            formatter.locale = Locale(identifier: "en_US_POSIX")
+            formatter.timeZone = TimeZone(identifier: "Europe/London")
+            formatter.dateFormat = "yyyy-MM-dd'T'HH:mm"
+
+            return zip(decoded.hourly.time, decoded.hourly.sea_level_height_msl)
+                .compactMap { time, height in
+                    guard let height, let date = formatter.date(from: time) else { return nil }
+                    return TidePoint(date: date, height: height)
+                }
         } catch {
             print("[tides] fetch failed: \(error.localizedDescription)")
             return []
         }
+    }
+
+    static func fetchEvents() async -> [TideEvent] {
+        await events(from: fetchSeries())
+    }
+
+    /// Finds local maxima/minima in a parsed sea-level series.
+    nonisolated static func events(from series: [TidePoint]) -> [TideEvent] {
+        guard series.count > 2 else { return [] }
+
+        var result: [TideEvent] = []
+        for index in 1..<(series.count - 1) {
+            let previous = series[index - 1].height
+            let current = series[index].height
+            let next = series[index + 1].height
+            let isHigh = current >= previous && current > next
+            let isLow = current <= previous && current < next
+            if isHigh || isLow {
+                result.append(TideEvent(date: series[index].date, isHigh: isHigh, height: current))
+            }
+        }
+        return result
     }
 
     /// Finds local maxima/minima in the hourly sea-level series.
