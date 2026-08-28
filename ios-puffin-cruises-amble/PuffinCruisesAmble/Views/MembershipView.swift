@@ -1,3 +1,4 @@
+import RevenueCat
 import SwiftUI
 
 struct MembershipView: View {
@@ -6,8 +7,11 @@ struct MembershipView: View {
     @State private var isSyncing = false
     @State private var statusMessage: String?
     @State private var showCopied = false
+    @State private var offeringPackage: Package?
+    @State private var isMembershipActive = false
+    @State private var isPurchasing = false
+    @State private var isRestoring = false
 
-    private let memberIdKey = "puffin_member_id"
     private let memberEmailKey = "puffin_member_email"
     private let memberPassKey = "puffin_member_pass"
 
@@ -17,7 +21,9 @@ struct MembershipView: View {
                 VStack(spacing: 0) {
                     hero
                     priceCard
-                    passCreator
+                    if isMembershipActive {
+                        passCreator
+                    }
                     if let pass, pass.active {
                         memberPass(pass)
                     }
@@ -28,6 +34,7 @@ struct MembershipView: View {
             .scrollDismissesKeyboard(.interactively)
             .toolbar(.hidden, for: .navigationBar)
             .onAppear(perform: loadPersisted)
+            .task { await loadMembershipState() }
             .alert("Membership", isPresented: .init(
                 get: { statusMessage != nil },
                 set: { if !$0 { statusMessage = nil } }
@@ -77,7 +84,7 @@ struct MembershipView: View {
 
     private var priceCard: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("£100/year")
+            Text(offeringPackage?.localizedPriceString ?? "£100/year")
                 .font(.system(size: 36, weight: .black))
                 .foregroundStyle(Theme.text)
             Text("Annual membership")
@@ -92,15 +99,55 @@ struct MembershipView: View {
             }
             .padding(.vertical, 18)
 
-            Link(destination: URL(string: "https://puffincruisesamble.co.uk/membership/")!) {
-                Text("Start Membership")
-                    .font(.system(size: 16, weight: .black))
+            if isMembershipActive {
+                HStack(spacing: 8) {
+                    Image(systemName: "checkmark.shield.fill")
+                    Text("Membership active")
+                        .font(.system(size: 16, weight: .black))
+                }
+                .foregroundStyle(Theme.sea)
+                .frame(maxWidth: .infinity)
+                .frame(height: 52)
+                .background(Theme.foam)
+                .clipShape(.rect(cornerRadius: 18))
+            } else {
+                Button { Task { await purchaseMembership() } } label: {
+                    Group {
+                        if isPurchasing {
+                            ProgressView().tint(.white)
+                        } else {
+                            Text("Start Membership").font(.system(size: 16, weight: .black))
+                        }
+                    }
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
                     .frame(height: 52)
                     .background(Theme.coral)
                     .clipShape(.rect(cornerRadius: 18))
+                }
+                .disabled(offeringPackage == nil || isPurchasing)
+                .opacity(offeringPackage == nil || isPurchasing ? 0.55 : 1)
             }
+
+            Button { Task { await restoreMembership() } } label: {
+                HStack(spacing: 6) {
+                    if isRestoring {
+                        ProgressView().tint(Theme.sea)
+                    } else {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.system(size: 12, weight: .bold))
+                        Text("Restore Purchases")
+                            .font(.system(size: 14, weight: .black))
+                    }
+                }
+                .foregroundStyle(Theme.sea)
+                .frame(maxWidth: .infinity)
+                .frame(height: 42)
+                .background(Theme.foam)
+                .clipShape(.rect(cornerRadius: 14))
+            }
+            .disabled(isRestoring)
+            .padding(.top, 12)
 
             HStack(spacing: 6) {
                 Link("Privacy Policy", destination: URL(string: "https://puffincruisesamble.co.uk/privacy-policy/")!)
@@ -216,14 +263,49 @@ struct MembershipView: View {
         .padding(16)
     }
 
-    // MARK: - Persistence
+    // MARK: - RevenueCat membership
 
-    private func memberId() -> String {
-        if let existing = UserDefaults.standard.string(forKey: memberIdKey) { return existing }
-        let next = "mem_\(Int(Date().timeIntervalSince1970))_\(UUID().uuidString.prefix(8))"
-        UserDefaults.standard.set(next, forKey: memberIdKey)
-        return next
+    private func loadMembershipState() async {
+        offeringPackage = await MembershipService.loadOfferingPackage()
+        isMembershipActive = await MembershipService.isMembershipActive()
     }
+
+    private func purchaseMembership() async {
+        guard let package = offeringPackage else { return }
+        isPurchasing = true
+        defer { isPurchasing = false }
+        do {
+            _ = try await MembershipService.purchase(package)
+            isMembershipActive = await MembershipService.isMembershipActive()
+            if isMembershipActive {
+                if email.trimmingCharacters(in: .whitespaces).isEmpty {
+                    statusMessage = "Membership active! Add your email below to create your QR pass."
+                } else {
+                    await syncPass()
+                }
+            }
+        } catch {
+            if (error as? ErrorCode) != .purchaseCancelledError {
+                statusMessage = "The membership could not be started. Please try again."
+            }
+        }
+    }
+
+    private func restoreMembership() async {
+        isRestoring = true
+        defer { isRestoring = false }
+        do {
+            _ = try await MembershipService.restorePurchases()
+            isMembershipActive = await MembershipService.isMembershipActive()
+            statusMessage = isMembershipActive
+                ? "Purchases restored. Your membership is active."
+                : "No active membership found for this Apple ID."
+        } catch {
+            statusMessage = "Restore failed. Please try again."
+        }
+    }
+
+    // MARK: - Persistence
 
     private func loadPersisted() {
         if let saved = UserDefaults.standard.string(forKey: memberEmailKey), email.isEmpty {
@@ -238,13 +320,13 @@ struct MembershipView: View {
     private func syncPass() async {
         isSyncing = true
         defer { isSyncing = false }
-        let expiry = ISO8601DateFormatter().string(from: Date().addingTimeInterval(365 * 24 * 60 * 60))
         do {
+            let info = await MembershipService.customerInfo()
             let next = try await BookingAPI.syncMembership(
-                memberId: memberId(),
+                memberId: MembershipService.memberID(),
                 email: email,
-                active: true,
-                expiresAt: expiry
+                active: await MembershipService.isMembershipActive(),
+                expiresAt: MembershipService.activeExpirationISO(from: info)
             )
             pass = next
             if let data = try? JSONEncoder().encode(next) {
