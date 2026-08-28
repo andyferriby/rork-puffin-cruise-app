@@ -726,7 +726,7 @@ async function handleWooProducts(request: Request, _env: Env): Promise<Response>
 }
 
 
-// ── APNs Broadcast (native iOS app) ─────────────────────────────
+// ── APNs Broadcast (native iOS app; response includes per-device rejection reasons) ──
 
 const APNS_BUNDLE_ID = "app.rork.in0r796f9fdds07w9xb7v";
 // Dev-signed builds register on the sandbox host; App Store/TestFlight on production.
@@ -745,12 +745,15 @@ function pemToPkcs8(pem: string): Uint8Array {
   return bytes;
 }
 
-// WebCrypto emits DER-encoded ECDSA signatures; APNs expects raw 64-byte r||s.
-function derSignatureToRaw(der: Uint8Array): Uint8Array {
+// Per the WebCrypto spec, ECDSA signatures are raw r||s (64 bytes for P-256) —
+// exactly what APNs expects. Some older runtimes emitted DER, so fall back to
+// a DER parse if the output isn't 64 bytes.
+function toRawSignature(bytes: Uint8Array): Uint8Array {
+  if (bytes.length === 64) return bytes;
   let offset = 2;
   const readInteger = (): Uint8Array => {
-    const length = der[offset + 1];
-    let value = der.slice(offset + 2, offset + 2 + length);
+    const length = bytes[offset + 1];
+    let value = bytes.slice(offset + 2, offset + 2 + length);
     offset += 2 + length;
     if (value.length > 32) value = value.slice(value.length - 32);
     const padded = new Uint8Array(32);
@@ -777,7 +780,7 @@ async function apnsProviderToken(env: Env): Promise<string> {
   const signature = new Uint8Array(
     await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, key, new TextEncoder().encode(signingInput)),
   );
-  return `${signingInput}.${base64Url(derSignatureToRaw(signature))}`;
+  return `${signingInput}.${base64Url(toRawSignature(signature))}`;
 }
 
 async function handleApnsBroadcast(request: Request, env: Env): Promise<Response> {
@@ -799,6 +802,7 @@ async function handleApnsBroadcast(request: Request, env: Env): Promise<Response
   const alertBody = JSON.stringify({ aps: { alert: { title, body }, sound: "default" } });
   let sent = 0;
   let failed = 0;
+  const failures: { status: number; reason: string }[] = [];
 
   for (const deviceToken of tokens) {
     let delivered = false;
@@ -819,6 +823,7 @@ async function handleApnsBroadcast(request: Request, env: Env): Promise<Response
           break;
         }
         const detail = await res.text();
+        failures.push({ status: res.status, reason: detail.slice(0, 200) });
         console.error("[apns] rejected", res.status, detail);
         if (!detail.includes("BadDeviceToken")) break;
       } catch (err) {
@@ -828,7 +833,7 @@ async function handleApnsBroadcast(request: Request, env: Env): Promise<Response
     if (delivered) sent += 1;
     else failed += 1;
   }
-  return json({ sent, failed, total: tokens.length });
+  return json({ sent, failed, total: tokens.length, failures });
 }
 
 export default {
