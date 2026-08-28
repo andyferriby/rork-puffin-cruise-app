@@ -30,6 +30,8 @@ struct AdminView: View {
     @State private var showPlacesEditor = false
     @State private var showScheduleEditor = false
     @State private var placeCount = 0
+    @State private var boat: BoatLocation?
+    @State private var isTogglingHide = false
 
     private let storedPinKey = "puffin_admin_pin"
     private let paperTicketValue = "PUFFIN_SHOP_TICKET_BOARDING"
@@ -152,6 +154,7 @@ struct AdminView: View {
                 scannerSection
                 paperQRSection
                 onBoardSection
+                trackerSection
                 pushSection
                 placesAdminSection
                 scheduleSummary
@@ -517,6 +520,83 @@ struct AdminView: View {
         }
     }
 
+    private var isTrackerHidden: Bool { boat?.isHidden == true }
+
+    private var trackerSection: some View {
+        section("Crew Boat Tracker") {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 12) {
+                    Image(systemName: boat?.isTracking == true ? "dot.radiowaves.left.and.right" : "ship.wheel")
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(boat?.isTracking == true ? .white : Theme.sea)
+                        .frame(width: 42, height: 42)
+                        .background(boat?.isTracking == true ? Theme.coral : Theme.foam)
+                        .clipShape(.rect(cornerRadius: 13))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(boat?.isTracking == true ? "Live tracking is on" : "Boat tracking is off")
+                            .font(.system(size: 16, weight: .black))
+                            .foregroundStyle(Theme.text)
+                        Text(trackerLastUpdate)
+                            .font(.system(size: 12))
+                            .foregroundStyle(Theme.textMuted)
+                    }
+                    Spacer()
+                }
+
+                Text("Tracking pings come from the crew phone on board. Use the switch below for private charters — it takes effect straight away, no restart needed.")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Theme.textMuted)
+                    .lineSpacing(3)
+
+                HStack(spacing: 12) {
+                    Image(systemName: "eye.slash")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(isTrackerHidden ? .white : Theme.textMuted)
+                        .frame(width: 34, height: 34)
+                        .background(isTrackerHidden ? Theme.deep : Theme.bg)
+                        .clipShape(.rect(cornerRadius: 11))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(isTrackerHidden ? "Location hidden from customers" : "Hide location from customers")
+                            .font(.system(size: 14, weight: .heavy))
+                            .foregroundStyle(Theme.text)
+                        Text(isTrackerHidden
+                             ? "Customers can't see the boat. Tap the switch to show it again."
+                             : "For private charters — hides the live boat from customer maps.")
+                            .font(.system(size: 11.5))
+                            .foregroundStyle(Theme.textMuted)
+                            .lineSpacing(2)
+                    }
+                    Spacer(minLength: 0)
+                    if isTogglingHide {
+                        ProgressView().tint(Theme.sea)
+                    } else {
+                        Toggle("", isOn: Binding(
+                            get: { isTrackerHidden },
+                            set: { newValue in Task { await toggleHide(newValue) } }
+                        ))
+                        .labelsHidden()
+                        .tint(Theme.deep)
+                    }
+                }
+                .padding(12)
+                .background(isTrackerHidden ? Theme.deep.opacity(0.08) : Theme.bg)
+                .clipShape(.rect(cornerRadius: 14))
+            }
+            .padding(16)
+            .puffinCard(fill: .white)
+        }
+    }
+
+    private var trackerLastUpdate: String {
+        guard let updatedAt = boat?.updatedAt,
+              let date = ISO8601DateFormatter().date(from: updatedAt) else {
+            return "Start when the crew phone is on board."
+        }
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm"
+        return "Last update \(formatter.string(from: date))"
+    }
+
     private var placesAdminSection: some View {
         section("Places to Eat") {
             VStack(alignment: .leading, spacing: 10) {
@@ -610,6 +690,19 @@ struct AdminView: View {
         boarded = await SupabaseService.fetchBoardedBookings()
         preprinted = await SupabaseService.fetchPreprintedBoarding()
         placeCount = await SupabaseService.fetchPlacesToEat().count
+        boat = await SupabaseService.fetchBoatLocation()
+    }
+
+    private func toggleHide(_ hidden: Bool) async {
+        isTogglingHide = true
+        defer { isTogglingHide = false }
+        do {
+            try await SupabaseService.setBoatHidden(hidden)
+            boat = await SupabaseService.fetchBoatLocation()
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+        } catch {
+            alertMessage = "Could not update tracker visibility. Please try again."
+        }
     }
 
     private func handleScan(_ value: String) async {

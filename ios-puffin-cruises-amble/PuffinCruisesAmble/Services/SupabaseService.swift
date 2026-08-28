@@ -161,6 +161,24 @@ enum SupabaseService {
         }
     }
 
+    /// Toggles the crew's "hide from customers" flag without disturbing the
+    /// live position or tracking state (fetch-modify-save keeps everything else).
+    static func setBoatHidden(_ hidden: Bool) async throws {
+        var location = (try await appConfig(BoatLocation.self, key: "boat_location"))
+            ?? BoatLocation(
+                latitude: 55.3338,
+                longitude: -1.5803,
+                accuracy: nil,
+                heading: nil,
+                speed: nil,
+                updatedAt: ISO8601DateFormatter().string(from: Date()),
+                isTracking: false,
+                isHidden: nil
+            )
+        location.isHidden = hidden
+        try await saveAppConfig(key: "boat_location", value: location)
+    }
+
     static func fetchPlacesToEat() async -> [PlaceToEat] {
         do {
             return try await appConfig([PlaceToEat].self, key: "places_to_eat") ?? []

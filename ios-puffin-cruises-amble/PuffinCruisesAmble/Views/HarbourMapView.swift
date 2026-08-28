@@ -92,13 +92,20 @@ struct HarbourMapView: View {
             .ignoresSafeArea()
 
             VStack(spacing: 10) {
-                HStack(spacing: 8) {
+                HStack(spacing: 10) {
                     Image(systemName: isBoatHidden ? "eye.slash" : "dot.radiowaves.left.and.right")
                         .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(isBoatLive ? Theme.coral : Theme.textMuted)
-                    Text(isBoatHidden ? "Live tracking hidden for a private charter" : isBoatLive ? "Boat tracking live" : "Boat not sailing right now")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(Theme.text)
+                        .foregroundStyle(isBoatHidden ? Theme.textMuted : (isBoatLive ? Theme.coral : Theme.textMuted))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(isBoatHidden ? "Tracker temporarily hidden" : isBoatLive ? "Boat is live on the water" : "Boat tracking is paused")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(Theme.text)
+                        if isBoatHidden {
+                            Text("The crew has hidden live tracking for a private charter.")
+                                .font(.system(size: 11.5))
+                                .foregroundStyle(Theme.textMuted)
+                        }
+                    }
                     Spacer()
                 }
                 .padding(.horizontal, 14)
