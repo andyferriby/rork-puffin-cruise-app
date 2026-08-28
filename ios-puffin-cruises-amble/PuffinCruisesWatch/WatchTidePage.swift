@@ -5,11 +5,15 @@ import WidgetKit
 @MainActor
 @Observable
 final class TideModel {
+    private(set) var all: [TideEvent] = []
     private(set) var upcoming: [TideEvent] = []
     private(set) var isLoading = false
     private(set) var loadFailed = false
 
     var next: TideEvent? { upcoming.first { $0.date > Date() } }
+
+    /// The most recent extreme that has already passed — used for tide momentum.
+    var previous: TideEvent? { all.last { $0.date <= Date() } }
 
     var todaysTides: [TideEvent] {
         let calendar = Calendar.current
@@ -19,9 +23,10 @@ final class TideModel {
     func load() async {
         isLoading = true
         defer { isLoading = false }
-        let events = await TideFetch.fetchEvents().filter { $0.date > Date().addingTimeInterval(-600) }
+        let events = await TideFetch.fetchEvents()
         loadFailed = events.isEmpty
-        upcoming = events
+        all = events
+        upcoming = events.filter { $0.date > Date().addingTimeInterval(-600) }
         // Keep the complication and Smart Stack card in sync.
         WidgetCenter.shared.reloadAllTimelines()
     }
@@ -81,6 +86,7 @@ struct TidePage: View {
                     )
                 } else if let tide = model.next {
                     nextTideCard(tide)
+                    momentumCard
                     todaysCard
                 }
                 alertsCard
@@ -137,6 +143,52 @@ struct TidePage: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .watchCard()
+    }
+
+    /// How far the water has travelled between the last extreme and the next one.
+    private var momentum: (isRising: Bool, fraction: Double, minutesLeft: Int)? {
+        guard let previous = model.previous, let next = model.next else { return nil }
+        let span = next.date.timeIntervalSince(previous.date)
+        guard span > 0 else { return nil }
+        let elapsed = Date().timeIntervalSince(previous.date)
+        let fraction = min(1, max(0, elapsed / span))
+        return (next.isHigh, fraction, Int((span - elapsed) / 60))
+    }
+
+    @ViewBuilder
+    private var momentumCard: some View {
+        if let momentum {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 5) {
+                    Image(systemName: momentum.isRising ? "waveform.path.ecg" : "waveform")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(momentum.isRising ? WatchTheme.gold : .cyan)
+                    Text("TIDE MOMENTUM")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(.white.opacity(0.55))
+                    Spacer(minLength: 0)
+                    Text(momentum.isRising ? "Rising" : "Ebbing")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(momentum.isRising ? WatchTheme.gold : .cyan)
+                }
+
+                ProgressView(value: momentum.fraction)
+                    .tint(momentum.isRising ? WatchTheme.gold : .cyan)
+
+                HStack {
+                    Text("\(Int(momentum.fraction * 100))% to \(momentum.isRising ? "high" : "low") water")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.8))
+                    Spacer(minLength: 0)
+                    Text("~\(max(0, momentum.minutesLeft)) min to go")
+                        .font(.system(size: 11, weight: .bold, design: .monospaced))
+                        .foregroundStyle(WatchTheme.mint)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .watchCard()
+            .animation(.easeInOut(duration: 0.5), value: momentum.fraction)
+        }
     }
 
     @ViewBuilder

@@ -5,5 +5,6 @@ import SwiftUI
 struct PuffinCruisesWatchWidgetsBundle: WidgetBundle {
     var body: some Widget {
         NextTideWidget()
+        NextSailingWidget()
     }
 }
