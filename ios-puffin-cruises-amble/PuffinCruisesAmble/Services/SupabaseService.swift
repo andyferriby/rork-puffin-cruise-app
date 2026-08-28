@@ -32,6 +32,11 @@ nonisolated struct PushTokenRow: Decodable {
     let token: String
 }
 
+nonisolated struct PushTokenUpsert: Encodable {
+    let token: String
+    let platform: String
+}
+
 /// Thin REST wrapper around the same Supabase project the Expo app uses.
 /// Stays MainActor-isolated (project default) so it can read `Config`;
 /// every network call suspends off the main thread inside URLSession.
@@ -286,6 +291,23 @@ enum SupabaseService {
             return rows.map(\.token)
         } catch {
             return []
+        }
+    }
+
+    /// Stores or refreshes a device push token so broadcasts can reach it.
+    static func upsertPushToken(_ token: String, platform: String) async {
+        guard isConfigured, !token.isEmpty else { return }
+        do {
+            let body = try JSONEncoder().encode([PushTokenUpsert(token: token, platform: platform)])
+            try await send(
+                path: "push_tokens",
+                query: [URLQueryItem(name: "on_conflict", value: "token")],
+                method: "POST",
+                body: body,
+                prefer: "resolution=merge-duplicates"
+            )
+        } catch {
+            print("[push] token save failed: \(error.localizedDescription)")
         }
     }
 }

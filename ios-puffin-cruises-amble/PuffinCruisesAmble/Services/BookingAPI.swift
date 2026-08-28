@@ -154,9 +154,11 @@ enum BookingAPI {
         }
     }
 
-    /// Broadcasts a push notification to every registered device via Expo's push API.
+    /// Broadcasts a push notification to every Expo device via Expo's push API.
+    /// Native APNs tokens are skipped — those need the APNs key relay described in
+    /// the push setup notes (Expo's API only accepts Expo push tokens).
     static func sendBroadcastPush(title: String, body: String) async throws -> Int {
-        let tokens = await SupabaseService.fetchPushTokens()
+        let tokens = await SupabaseService.fetchPushTokens().filter { $0.hasPrefix("Expo") }
         guard !tokens.isEmpty else { return 0 }
         guard let url = URL(string: "https://exp.host/--/api/v2/push/send") else { return 0 }
 

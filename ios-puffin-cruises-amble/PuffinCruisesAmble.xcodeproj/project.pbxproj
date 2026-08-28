@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		XX84EDA8D9605EDABB8701XX /* PuffinCruisesWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = XXDB1B901E060E1317BCECXX /* PuffinCruisesWatch.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		105FC58A2E9EAD3200EA8BCF /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -21,12 +25,34 @@
 			remoteGlobalIDString = 105FC5792E9EAD3100EA8BCF;
 			remoteInfo = PuffinCruisesAmble;
 		};
+		XX300B7FC2B5A6BA2FDAF2XX /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 105FC5722E9EAD3100EA8BCF /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = XX24447AC65F84BEDF863DXX;
+			remoteInfo = PuffinCruisesWatch;
+		};
 /* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		XX81FF245A222E3682268EXX /* Embed Watch Content */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				XX84EDA8D9605EDABB8701XX /* PuffinCruisesWatch.app in Embed Watch Content */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			name = "Embed Watch Content";
+			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
+			dstSubfolderSpec = 16;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		105FC57A2E9EAD3100EA8BCF /* PuffinCruisesAmble.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PuffinCruisesAmble.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		105FC5892E9EAD3200EA8BCF /* PuffinCruisesAmbleTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PuffinCruisesAmbleTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		105FC5932E9EAD3200EA8BCF /* PuffinCruisesAmbleUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PuffinCruisesAmbleUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		XXDB1B901E060E1317BCECXX /* PuffinCruisesWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PuffinCruisesWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -43,6 +69,11 @@
 		105FC5962E9EAD3200EA8BCF /* PuffinCruisesAmbleUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = PuffinCruisesAmbleUITests;
+			sourceTree = "<group>";
+		};
+		XX00E8FECE23EA04374BBFXX /* PuffinCruisesWatch */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = PuffinCruisesWatch;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -69,6 +100,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		XXFAE07B7C4F2886D46DCAXX /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -79,6 +117,7 @@
 				105FC58C2E9EAD3200EA8BCF /* PuffinCruisesAmbleTests */,
 				105FC5962E9EAD3200EA8BCF /* PuffinCruisesAmbleUITests */,
 				105FC57B2E9EAD3100EA8BCF /* Products */,
+				XX00E8FECE23EA04374BBFXX /* PuffinCruisesWatch */,
 			);
 			sourceTree = "<group>";
 		};
@@ -88,6 +127,7 @@
 				105FC57A2E9EAD3100EA8BCF /* PuffinCruisesAmble.app */,
 				105FC5892E9EAD3200EA8BCF /* PuffinCruisesAmbleTests.xctest */,
 				105FC5932E9EAD3200EA8BCF /* PuffinCruisesAmbleUITests.xctest */,
+				XXDB1B901E060E1317BCECXX /* PuffinCruisesWatch.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -102,10 +142,12 @@
 				105FC5762E9EAD3100EA8BCF /* Sources */,
 				105FC5772E9EAD3100EA8BCF /* Frameworks */,
 				105FC5782E9EAD3100EA8BCF /* Resources */,
+				XX81FF245A222E3682268EXX /* Embed Watch Content */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				XXB0123D4ECD996AECE07DXX /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				105FC57C2E9EAD3100EA8BCF /* PuffinCruisesAmble */,
@@ -163,6 +205,26 @@
 			productReference = 105FC5932E9EAD3200EA8BCF /* PuffinCruisesAmbleUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
+		XX24447AC65F84BEDF863DXX /* PuffinCruisesWatch */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = XX76610486BB854655E2B6XX /* Build configuration list for PBXNativeTarget "PuffinCruisesWatch" */;
+			buildPhases = (
+				XXC7967C778C6D89A3D86AXX /* Sources */,
+				XXFAE07B7C4F2886D46DCAXX /* Frameworks */,
+				XXDAE05332A06F9FDB2D1DXX /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = PuffinCruisesWatch;
+			productName = PuffinCruisesWatch;
+			productReference = XXDB1B901E060E1317BCECXX /* PuffinCruisesWatch.app */;
+			productType = "com.apple.product-type.application";
+			fileSystemSynchronizedGroups = (
+				XX00E8FECE23EA04374BBFXX /* PuffinCruisesWatch */,
+			);
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -203,6 +265,7 @@
 				105FC5792E9EAD3100EA8BCF /* PuffinCruisesAmble */,
 				105FC5882E9EAD3200EA8BCF /* PuffinCruisesAmbleTests */,
 				105FC5922E9EAD3200EA8BCF /* PuffinCruisesAmbleUITests */,
+				XX24447AC65F84BEDF863DXX /* PuffinCruisesWatch */,
 			);
 		};
 /* End PBXProject section */
@@ -223,6 +286,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		105FC5912E9EAD3200EA8BCF /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		XXDAE05332A06F9FDB2D1DXX /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -253,6 +323,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		XXC7967C778C6D89A3D86AXX /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -265,6 +342,11 @@
 			isa = PBXTargetDependency;
 			target = 105FC5792E9EAD3100EA8BCF /* PuffinCruisesAmble */;
 			targetProxy = 105FC5942E9EAD3200EA8BCF /* PBXContainerItemProxy */;
+		};
+		XXB0123D4ECD996AECE07DXX /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = XX24447AC65F84BEDF863DXX /* PuffinCruisesWatch */;
+			targetProxy = XX300B7FC2B5A6BA2FDAF2XX /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -413,6 +495,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0.0;
+				CODE_SIGN_ENTITLEMENTS = PuffinCruisesAmble/PuffinCruisesAmble.entitlements;
 				PRODUCT_BUNDLE_IDENTIFIER = app.rork.in0r796f9fdds07w9xb7v;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -448,6 +531,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0.0;
+				CODE_SIGN_ENTITLEMENTS = PuffinCruisesAmble/PuffinCruisesAmble.entitlements;
 				PRODUCT_BUNDLE_IDENTIFIER = app.rork.in0r796f9fdds07w9xb7v;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -470,7 +554,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				MARKETING_VERSION = 1.0.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "app.rork.in0r796f9fdds07w9xb7v.tests";
+				PRODUCT_BUNDLE_IDENTIFIER = app.rork.in0r796f9fdds07w9xb7v.tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -492,7 +576,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				MARKETING_VERSION = 1.0.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "app.rork.in0r796f9fdds07w9xb7v.tests";
+				PRODUCT_BUNDLE_IDENTIFIER = app.rork.in0r796f9fdds07w9xb7v.tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -512,7 +596,7 @@
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "app.rork.in0r796f9fdds07w9xb7v.uitests";
+				PRODUCT_BUNDLE_IDENTIFIER = app.rork.in0r796f9fdds07w9xb7v.uitests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -532,7 +616,7 @@
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "app.rork.in0r796f9fdds07w9xb7v.uitests";
+				PRODUCT_BUNDLE_IDENTIFIER = app.rork.in0r796f9fdds07w9xb7v.uitests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -541,6 +625,62 @@
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_TARGET_NAME = PuffinCruisesAmble;
+			};
+			name = Release;
+		};
+		XX128222932601C73B9592XX /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				PRODUCT_BUNDLE_IDENTIFIER = app.rork.in0r796f9fdds07w9xb7v.puffincruiseswatch;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				WATCHOS_DEPLOYMENT_TARGET = 11.0;
+				SUPPORTED_PLATFORMS = "watchos watchsimulator";
+				GENERATE_INFOPLIST_FILE = YES;
+				SWIFT_VERSION = 5.0;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				MARKETING_VERSION = 1.0;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks";
+				TARGETED_DEVICE_FAMILY = 4;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				INFOPLIST_KEY_CFBundleDisplayName = "$(PRODUCT_NAME)";
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				ENABLE_PREVIEWS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = app.rork.in0r796f9fdds07w9xb7v;
+			};
+			name = Debug;
+		};
+		XX410C9B8E3BD3D15CED0CXX /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				PRODUCT_BUNDLE_IDENTIFIER = app.rork.in0r796f9fdds07w9xb7v.puffincruiseswatch;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				WATCHOS_DEPLOYMENT_TARGET = 11.0;
+				SUPPORTED_PLATFORMS = "watchos watchsimulator";
+				GENERATE_INFOPLIST_FILE = YES;
+				SWIFT_VERSION = 5.0;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				MARKETING_VERSION = 1.0;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks";
+				TARGETED_DEVICE_FAMILY = 4;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				INFOPLIST_KEY_CFBundleDisplayName = "$(PRODUCT_NAME)";
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				ENABLE_PREVIEWS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = app.rork.in0r796f9fdds07w9xb7v;
 			};
 			name = Release;
 		};
@@ -579,6 +719,15 @@
 			buildConfigurations = (
 				105FC5A42E9EAD3200EA8BCF /* Debug */,
 				105FC5A52E9EAD3200EA8BCF /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		XX76610486BB854655E2B6XX /* Build configuration list for PBXNativeTarget "PuffinCruisesWatch" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				XX128222932601C73B9592XX /* Debug */,
+				XX410C9B8E3BD3D15CED0CXX /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
