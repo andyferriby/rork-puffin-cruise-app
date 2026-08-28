@@ -219,7 +219,11 @@ struct PlaceDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 if let imageURL = place.imageURL, let url = URL(string: imageURL) {
-                    heroImage(url)
+                    if extraGalleryURLs.isEmpty {
+                        heroImage(url)
+                    } else {
+                        heroGallery(main: url)
+                    }
                 }
 
                 VStack(alignment: .leading, spacing: 4) {
@@ -332,6 +336,41 @@ struct PlaceDetailView: View {
                 .accessibilityLabel(favorites.isFavorite(place) ? "Remove from favourites" : "Add to favourites")
             }
         }
+    }
+
+    /// Extra gallery pictures beyond the main picture, capped at three.
+    private var extraGalleryURLs: [URL] {
+        (place.gallery ?? []).prefix(3).compactMap { URL(string: $0) }
+    }
+
+    /// Main picture plus gallery as a swipeable pager, honouring the
+    /// per-place fill/whole-image choice on every page.
+    private func heroGallery(main url: URL) -> some View {
+        let images = [url] + extraGalleryURLs
+        return TabView {
+            ForEach(Array(images.enumerated()), id: \.offset) { _, imageURL in
+                Color(Theme.foam)
+                    .overlay {
+                        AsyncImage(url: imageURL) { phase in
+                            switch phase {
+                            case .success(let image):
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: place.displaysWholeImage ? .fit : .fill)
+                                    .allowsHitTesting(false)
+                            default:
+                                Image(systemName: "photo")
+                                    .font(.system(size: 36))
+                                    .foregroundStyle(Theme.sea)
+                            }
+                        }
+                    }
+                    .clipped()
+            }
+        }
+        .tabViewStyle(.page(indexDisplayMode: .automatic))
+        .frame(height: 200)
+        .clipShape(.rect(cornerRadius: 18))
     }
 
     /// Banner picture. "Fill" crops a landscape photo to the wide strip;

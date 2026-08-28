@@ -13,6 +13,7 @@ nonisolated struct WatchPlace: Decodable, Identifiable, Hashable {
     let phone: String?
     let website: String?
     let imageURL: String?
+    let gallery: [String]?
 }
 
 /// Minimal fetch for the watch app — talks to Supabase REST directly using the

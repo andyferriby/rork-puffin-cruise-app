@@ -110,6 +110,31 @@ private struct PlaceDetailPage: View {
                         }
                         .clipShape(.rect(cornerRadius: 12))
                 }
+                if let gallery = place.gallery, !gallery.isEmpty {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 6) {
+                            ForEach(gallery.prefix(3), id: \.self) { urlString in
+                                if let url = URL(string: urlString) {
+                                    Color.white.opacity(0.1)
+                                        .frame(width: 92, height: 70)
+                                        .overlay {
+                                            AsyncImage(url: url) { phase in
+                                                switch phase {
+                                                case .success(let image):
+                                                    image.resizable().aspectRatio(contentMode: .fill).allowsHitTesting(false)
+                                                default:
+                                                    Image(systemName: "photo")
+                                                        .font(.system(size: 16, weight: .bold))
+                                                        .foregroundStyle(WatchTheme.gold)
+                                                }
+                                            }
+                                        }
+                                        .clipShape(.rect(cornerRadius: 10))
+                                }
+                            }
+                        }
+                    }
+                }
                 if let blurb = place.blurb, !blurb.isEmpty {
                     Text(blurb)
                         .font(.system(size: 12, weight: .semibold))

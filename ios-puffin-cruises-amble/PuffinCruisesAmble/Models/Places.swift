@@ -13,6 +13,8 @@ nonisolated struct PlaceToEat: Codable, Identifiable, Hashable {
     var imageURL: String?
     var phone: String?
     var website: String?
+    /// Up to three extra gallery pictures, stored as URLs.
+    var gallery: [String]?
     /// "fill" (default) crops the picture to the banner; "fit" shows the whole
     /// image uncropped — better for logos and portrait photos.
     var imageFit: String?
