@@ -27,6 +27,9 @@ struct AdminView: View {
     @State private var pushBody = ""
     @State private var isSendingPush = false
     @State private var alertMessage: String?
+    @State private var showPlacesEditor = false
+    @State private var showScheduleEditor = false
+    @State private var placeCount = 0
 
     private let storedPinKey = "puffin_admin_pin"
     private let paperTicketValue = "PUFFIN_SHOP_TICKET_BOARDING"
@@ -59,6 +62,12 @@ struct AdminView: View {
                 Button("OK", role: .cancel) { alertMessage = nil }
             } message: {
                 Text(alertMessage ?? "")
+            }
+            .sheet(isPresented: $showPlacesEditor) {
+                PlacesAdminSheet()
+            }
+            .sheet(isPresented: $showScheduleEditor) {
+                ScheduleAdminSheet()
             }
         }
     }
@@ -144,6 +153,7 @@ struct AdminView: View {
                 paperQRSection
                 onBoardSection
                 pushSection
+                placesAdminSection
                 scheduleSummary
             }
             .padding(16)
@@ -507,6 +517,35 @@ struct AdminView: View {
         }
     }
 
+    private var placesAdminSection: some View {
+        section("Places to Eat") {
+            VStack(alignment: .leading, spacing: 10) {
+                Text(placeCount == 0 ? "No places added yet." : "\(placeCount) place\(placeCount == 1 ? "" : "s") published to guests.")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Theme.textMuted)
+                Text("Add pubs, cafés and chippies with photos, locations and walking directions. Guests see them instantly — on iPhone and Watch.")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Theme.textMuted)
+                    .lineSpacing(3)
+
+                Button { showPlacesEditor = true } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "fork.knife")
+                        Text("Edit Places to Eat").font(.system(size: 15, weight: .black))
+                    }
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 48)
+                    .background(Theme.sea)
+                    .clipShape(.rect(cornerRadius: 14))
+                }
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .puffinCard(fill: .white)
+        }
+    }
+
     private var scheduleSummary: some View {
         section("Today's Sailings") {
             VStack(alignment: .leading, spacing: 10) {
@@ -535,10 +574,18 @@ struct AdminView: View {
                         .foregroundStyle(Theme.textMuted)
                 }
 
-                Text("Sailing times and cruise types are edited in the main app's admin tools.")
-                    .font(.system(size: 12))
-                    .foregroundStyle(Theme.textMuted)
-                    .padding(.top, 4)
+                Button { showScheduleEditor = true } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "calendar.badge.plus")
+                        Text("Edit Schedule & Cruises").font(.system(size: 15, weight: .black))
+                    }
+                    .foregroundStyle(Theme.sea)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 48)
+                    .background(Theme.foam)
+                    .clipShape(.rect(cornerRadius: 14))
+                }
+                .padding(.top, 6)
             }
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -562,6 +609,7 @@ struct AdminView: View {
     private func refresh() async {
         boarded = await SupabaseService.fetchBoardedBookings()
         preprinted = await SupabaseService.fetchPreprintedBoarding()
+        placeCount = await SupabaseService.fetchPlacesToEat().count
     }
 
     private func handleScan(_ value: String) async {

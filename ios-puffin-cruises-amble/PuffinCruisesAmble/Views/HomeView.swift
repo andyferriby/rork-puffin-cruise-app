@@ -56,10 +56,10 @@ struct HomeView: View {
             .background(Theme.bg)
             .ignoresSafeArea(edges: .top)
             .navigationDestination(for: String.self) { value in
-                if value == "coast-secrets" {
-                    CoastSecretsView()
-                } else {
-                    BookView()
+                switch value {
+                case "coast-secrets": CoastSecretsView()
+                case "schedule": ScheduleView(showsOwnNavigation: false)
+                default: BookView()
                 }
             }
             .refreshable { await schedule.load(force: true) }

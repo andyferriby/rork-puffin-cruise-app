@@ -1,6 +1,10 @@
 import SwiftUI
 
 struct ScheduleView: View {
+    /// Standalone (tab) mode wraps its own NavigationStack and hides the bar;
+    /// embedded (pushed from Home) reuses the host stack so Back stays visible.
+    var showsOwnNavigation = true
+
     @Environment(ScheduleStore.self) private var schedule
     @State private var selectedDate: String?
 
@@ -9,8 +13,18 @@ struct ScheduleView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
+        if showsOwnNavigation {
+            NavigationStack {
+                content
+            }
+        } else {
+            content
+                .navigationTitle("Sailings")
+        }
+    }
+
+    private var content: some View {
+        ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Sailings")
@@ -61,9 +75,8 @@ struct ScheduleView: View {
             }
             .background(Theme.bg)
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar(.hidden, for: .navigationBar)
+            .toolbar(showsOwnNavigation ? .hidden : .visible, for: .navigationBar)
             .refreshable { await schedule.load(force: true) }
-        }
     }
 
     private func dayChip(_ day: DaySchedule) -> some View {

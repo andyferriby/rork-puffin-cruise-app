@@ -170,6 +170,14 @@ enum SupabaseService {
         }
     }
 
+    static func savePlacesToEat(_ places: [PlaceToEat]) async throws {
+        try await saveAppConfig(key: "places_to_eat", value: places)
+    }
+
+    static func saveSchedule(_ config: ScheduleConfig) async throws {
+        try await saveAppConfig(key: "schedule", value: config)
+    }
+
     static func fetchPreprintedBoarding() async -> PreprintedBoarding {
         do {
             return try await appConfig(PreprintedBoarding.self, key: "preprinted_boarding")
