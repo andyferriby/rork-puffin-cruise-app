@@ -583,9 +583,9 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0.0;
+				MARKETING_VERSION = 1.0.6;
 				CODE_SIGN_ENTITLEMENTS = PuffinCruisesAmble/PuffinCruisesAmble.entitlements;
-				PRODUCT_BUNDLE_IDENTIFIER = app.rork.in0r796f9fdds07w9xb7v;
+				PRODUCT_BUNDLE_IDENTIFIER = app.rork.gpczuon7nhtm91bqwzkc7;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -619,9 +619,9 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0.0;
+				MARKETING_VERSION = 1.0.6;
 				CODE_SIGN_ENTITLEMENTS = PuffinCruisesAmble/PuffinCruisesAmble.entitlements;
-				PRODUCT_BUNDLE_IDENTIFIER = app.rork.in0r796f9fdds07w9xb7v;
+				PRODUCT_BUNDLE_IDENTIFIER = app.rork.gpczuon7nhtm91bqwzkc7;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -642,8 +642,8 @@
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
-				MARKETING_VERSION = 1.0.0;
-				PRODUCT_BUNDLE_IDENTIFIER = app.rork.in0r796f9fdds07w9xb7v.tests;
+				MARKETING_VERSION = 1.0.6;
+				PRODUCT_BUNDLE_IDENTIFIER = app.rork.gpczuon7nhtm91bqwzkc7.tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -664,8 +664,8 @@
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
-				MARKETING_VERSION = 1.0.0;
-				PRODUCT_BUNDLE_IDENTIFIER = app.rork.in0r796f9fdds07w9xb7v.tests;
+				MARKETING_VERSION = 1.0.6;
+				PRODUCT_BUNDLE_IDENTIFIER = app.rork.gpczuon7nhtm91bqwzkc7.tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -684,8 +684,8 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = YES;
-				MARKETING_VERSION = 1.0.0;
-				PRODUCT_BUNDLE_IDENTIFIER = app.rork.in0r796f9fdds07w9xb7v.uitests;
+				MARKETING_VERSION = 1.0.6;
+				PRODUCT_BUNDLE_IDENTIFIER = app.rork.gpczuon7nhtm91bqwzkc7.uitests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -704,8 +704,8 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = YES;
-				MARKETING_VERSION = 1.0.0;
-				PRODUCT_BUNDLE_IDENTIFIER = app.rork.in0r796f9fdds07w9xb7v.uitests;
+				MARKETING_VERSION = 1.0.6;
+				PRODUCT_BUNDLE_IDENTIFIER = app.rork.gpczuon7nhtm91bqwzkc7.uitests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -720,7 +720,7 @@
 		XX0DD8BF903AFC3557972EXX /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				PRODUCT_BUNDLE_IDENTIFIER = app.rork.in0r796f9fdds07w9xb7v.puffincruiseswatch.puffincruiseswatchwidgets;
+				PRODUCT_BUNDLE_IDENTIFIER = app.rork.gpczuon7nhtm91bqwzkc7.puffincruiseswatch.puffincruiseswatchwidgets;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;
 				WATCHOS_DEPLOYMENT_TARGET = 11.0;
@@ -733,7 +733,7 @@
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.0.6;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks";
 				TARGETED_DEVICE_FAMILY = 4;
 				INFOPLIST_KEY_CFBundleDisplayName = "$(PRODUCT_NAME)";
@@ -743,7 +743,7 @@
 		XX128222932601C73B9592XX /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				PRODUCT_BUNDLE_IDENTIFIER = app.rork.in0r796f9fdds07w9xb7v.puffincruiseswatch;
+				PRODUCT_BUNDLE_IDENTIFIER = app.rork.gpczuon7nhtm91bqwzkc7.puffincruiseswatch;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;
 				WATCHOS_DEPLOYMENT_TARGET = 11.0;
@@ -755,7 +755,7 @@
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.0.6;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks";
 				TARGETED_DEVICE_FAMILY = 4;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -764,14 +764,14 @@
 				ENABLE_PREVIEWS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
-				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = app.rork.in0r796f9fdds07w9xb7v;
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = app.rork.gpczuon7nhtm91bqwzkc7;
 			};
 			name = Debug;
 		};
 		XX410C9B8E3BD3D15CED0CXX /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				PRODUCT_BUNDLE_IDENTIFIER = app.rork.in0r796f9fdds07w9xb7v.puffincruiseswatch;
+				PRODUCT_BUNDLE_IDENTIFIER = app.rork.gpczuon7nhtm91bqwzkc7.puffincruiseswatch;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;
 				WATCHOS_DEPLOYMENT_TARGET = 11.0;
@@ -783,7 +783,7 @@
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.0.6;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks";
 				TARGETED_DEVICE_FAMILY = 4;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -792,14 +792,14 @@
 				ENABLE_PREVIEWS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
-				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = app.rork.in0r796f9fdds07w9xb7v;
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = app.rork.gpczuon7nhtm91bqwzkc7;
 			};
 			name = Release;
 		};
 		XX67E85F7B3969FC836C5AXX /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				PRODUCT_BUNDLE_IDENTIFIER = app.rork.in0r796f9fdds07w9xb7v.puffincruiseswatch.puffincruiseswatchwidgets;
+				PRODUCT_BUNDLE_IDENTIFIER = app.rork.gpczuon7nhtm91bqwzkc7.puffincruiseswatch.puffincruiseswatchwidgets;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = watchos;
 				WATCHOS_DEPLOYMENT_TARGET = 11.0;
@@ -812,7 +812,7 @@
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.0.6;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks";
 				TARGETED_DEVICE_FAMILY = 4;
 				INFOPLIST_KEY_CFBundleDisplayName = "$(PRODUCT_NAME)";

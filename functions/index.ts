@@ -726,9 +726,9 @@ async function handleWooProducts(request: Request, _env: Env): Promise<Response>
 }
 
 
-// ── APNs Broadcast (native iOS app; response includes per-device rejection reasons) ──
+// ── APNs Broadcast (topic = live App Store bundle id; per-device rejection reasons in response) ──
 
-const APNS_BUNDLE_ID = "app.rork.in0r796f9fdds07w9xb7v";
+const APNS_BUNDLE_ID = "app.rork.gpczuon7nhtm91bqwzkc7";
 // Dev-signed builds register on the sandbox host; App Store/TestFlight on production.
 const APNS_HOSTS = ["https://api.push.apple.com", "https://api.sandbox.push.apple.com"];
 
