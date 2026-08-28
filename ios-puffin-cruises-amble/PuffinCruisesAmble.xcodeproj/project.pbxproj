@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		XX84EDA8D9605EDABB8701XX /* PuffinCruisesWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = XXDB1B901E060E1317BCECXX /* PuffinCruisesWatch.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		XXC0833AC2062EC0F3D5A2XX /* PuffinCruisesWatchWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = XX45751141F754C321D4BDXX /* PuffinCruisesWatchWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -32,6 +33,13 @@
 			remoteGlobalIDString = XX24447AC65F84BEDF863DXX;
 			remoteInfo = PuffinCruisesWatch;
 		};
+		XXF56D808EFAF8ED3C1694XX /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 105FC5722E9EAD3100EA8BCF /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = XX8955D07296272B4FB809XX;
+			remoteInfo = PuffinCruisesWatchWidgets;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -46,14 +54,36 @@
 			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
 			dstSubfolderSpec = 16;
 		};
+		XX8618DA762832199DA68BXX /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				XXC0833AC2062EC0F3D5A2XX /* PuffinCruisesWatchWidgets.appex in Embed Foundation Extensions */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			name = "Embed Foundation Extensions";
+			dstPath = "";
+			dstSubfolderSpec = 13;
+		};
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		105FC57A2E9EAD3100EA8BCF /* PuffinCruisesAmble.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PuffinCruisesAmble.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		105FC5892E9EAD3200EA8BCF /* PuffinCruisesAmbleTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PuffinCruisesAmbleTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		105FC5932E9EAD3200EA8BCF /* PuffinCruisesAmbleUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PuffinCruisesAmbleUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		XX45751141F754C321D4BDXX /* PuffinCruisesWatchWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = PuffinCruisesWatchWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		XXDB1B901E060E1317BCECXX /* PuffinCruisesWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PuffinCruisesWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		XX943DD2A6E37A81DA7DC6XX /* Exceptions for "PuffinCruisesWatchWidgets" folder in "PuffinCruisesWatchWidgets" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = XX8955D07296272B4FB809XX /* PuffinCruisesWatchWidgets */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		105FC57C2E9EAD3100EA8BCF /* PuffinCruisesAmble */ = {
@@ -75,6 +105,14 @@
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = PuffinCruisesWatch;
 			sourceTree = "<group>";
+		};
+		XX9FECEDE6B004373B4575XX /* PuffinCruisesWatchWidgets */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = PuffinCruisesWatchWidgets;
+			sourceTree = "<group>";
+			exceptions = (
+				XX943DD2A6E37A81DA7DC6XX /* Exceptions for "PuffinCruisesWatchWidgets" folder in "PuffinCruisesWatchWidgets" target */,
+			);
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
@@ -107,6 +145,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		XXFD0B35006E3BB877A04BXX /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -118,6 +163,7 @@
 				105FC5962E9EAD3200EA8BCF /* PuffinCruisesAmbleUITests */,
 				105FC57B2E9EAD3100EA8BCF /* Products */,
 				XX00E8FECE23EA04374BBFXX /* PuffinCruisesWatch */,
+				XX9FECEDE6B004373B4575XX /* PuffinCruisesWatchWidgets */,
 			);
 			sourceTree = "<group>";
 		};
@@ -128,6 +174,7 @@
 				105FC5892E9EAD3200EA8BCF /* PuffinCruisesAmbleTests.xctest */,
 				105FC5932E9EAD3200EA8BCF /* PuffinCruisesAmbleUITests.xctest */,
 				XXDB1B901E060E1317BCECXX /* PuffinCruisesWatch.app */,
+				XX45751141F754C321D4BDXX /* PuffinCruisesWatchWidgets.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -212,10 +259,12 @@
 				XXC7967C778C6D89A3D86AXX /* Sources */,
 				XXFAE07B7C4F2886D46DCAXX /* Frameworks */,
 				XXDAE05332A06F9FDB2D1DXX /* Resources */,
+				XX8618DA762832199DA68BXX /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				XXB89E3C44D6D103124B2DXX /* PBXTargetDependency */,
 			);
 			name = PuffinCruisesWatch;
 			productName = PuffinCruisesWatch;
@@ -223,6 +272,26 @@
 			productType = "com.apple.product-type.application";
 			fileSystemSynchronizedGroups = (
 				XX00E8FECE23EA04374BBFXX /* PuffinCruisesWatch */,
+			);
+		};
+		XX8955D07296272B4FB809XX /* PuffinCruisesWatchWidgets */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = XXFDF0DFF96662C3AB97BAXX /* Build configuration list for PBXNativeTarget "PuffinCruisesWatchWidgets" */;
+			buildPhases = (
+				XX22DC036DEBFF6209A573XX /* Sources */,
+				XXFD0B35006E3BB877A04BXX /* Frameworks */,
+				XX3458D35DC95787294441XX /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = PuffinCruisesWatchWidgets;
+			productName = PuffinCruisesWatchWidgets;
+			productReference = XX45751141F754C321D4BDXX /* PuffinCruisesWatchWidgets.appex */;
+			productType = "com.apple.product-type.app-extension";
+			fileSystemSynchronizedGroups = (
+				XX9FECEDE6B004373B4575XX /* PuffinCruisesWatchWidgets */,
 			);
 		};
 /* End PBXNativeTarget section */
@@ -266,6 +335,7 @@
 				105FC5882E9EAD3200EA8BCF /* PuffinCruisesAmbleTests */,
 				105FC5922E9EAD3200EA8BCF /* PuffinCruisesAmbleUITests */,
 				XX24447AC65F84BEDF863DXX /* PuffinCruisesWatch */,
+				XX8955D07296272B4FB809XX /* PuffinCruisesWatchWidgets */,
 			);
 		};
 /* End PBXProject section */
@@ -286,6 +356,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		105FC5912E9EAD3200EA8BCF /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		XX3458D35DC95787294441XX /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -323,6 +400,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		XX22DC036DEBFF6209A573XX /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		XXC7967C778C6D89A3D86AXX /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -347,6 +431,11 @@
 			isa = PBXTargetDependency;
 			target = XX24447AC65F84BEDF863DXX /* PuffinCruisesWatch */;
 			targetProxy = XX300B7FC2B5A6BA2FDAF2XX /* PBXContainerItemProxy */;
+		};
+		XXB89E3C44D6D103124B2DXX /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = XX8955D07296272B4FB809XX /* PuffinCruisesWatchWidgets */;
+			targetProxy = XXF56D808EFAF8ED3C1694XX /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -628,6 +717,28 @@
 			};
 			name = Release;
 		};
+		XX0DD8BF903AFC3557972EXX /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				PRODUCT_BUNDLE_IDENTIFIER = app.rork.in0r796f9fdds07w9xb7v.puffincruiseswatch.puffincruiseswatchwidgets;
+				SDKROOT = watchos;
+				WATCHOS_DEPLOYMENT_TARGET = 11.0;
+				SUPPORTED_PLATFORMS = "watchos watchsimulator";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = PuffinCruisesWatchWidgets/Info.plist;
+				SWIFT_VERSION = 5.0;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				MARKETING_VERSION = 1.0;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks";
+				TARGETED_DEVICE_FAMILY = 4;
+				INFOPLIST_KEY_CFBundleDisplayName = "$(PRODUCT_NAME)";
+			};
+			name = Release;
+		};
 		XX128222932601C73B9592XX /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -684,6 +795,27 @@
 			};
 			name = Release;
 		};
+		XX67E85F7B3969FC836C5AXX /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				PRODUCT_BUNDLE_IDENTIFIER = app.rork.in0r796f9fdds07w9xb7v.puffincruiseswatch.puffincruiseswatchwidgets;
+				SDKROOT = watchos;
+				WATCHOS_DEPLOYMENT_TARGET = 11.0;
+				SUPPORTED_PLATFORMS = "watchos watchsimulator";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = PuffinCruisesWatchWidgets/Info.plist;
+				SWIFT_VERSION = 5.0;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				MARKETING_VERSION = 1.0;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks";
+				INFOPLIST_KEY_CFBundleDisplayName = "$(PRODUCT_NAME)";
+			};
+			name = Debug;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -728,6 +860,15 @@
 			buildConfigurations = (
 				XX128222932601C73B9592XX /* Debug */,
 				XX410C9B8E3BD3D15CED0CXX /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		XXFDF0DFF96662C3AB97BAXX /* Build configuration list for PBXNativeTarget "PuffinCruisesWatchWidgets" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				XX67E85F7B3969FC836C5AXX /* Debug */,
+				XX0DD8BF903AFC3557972EXX /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

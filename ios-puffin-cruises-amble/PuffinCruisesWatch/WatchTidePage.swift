@@ -1,0 +1,180 @@
+import SwiftUI
+import UserNotifications
+import WidgetKit
+
+@MainActor
+@Observable
+final class TideModel {
+    private(set) var upcoming: [TideEvent] = []
+    private(set) var isLoading = false
+    private(set) var loadFailed = false
+
+    var next: TideEvent? { upcoming.first { $0.date > Date() } }
+
+    var todaysTides: [TideEvent] {
+        let calendar = Calendar.current
+        return upcoming.filter { calendar.isDateInToday($0.date) }
+    }
+
+    func load() async {
+        isLoading = true
+        defer { isLoading = false }
+        let events = await TideFetch.fetchEvents().filter { $0.date > Date().addingTimeInterval(-600) }
+        loadFailed = events.isEmpty
+        upcoming = events
+        // Keep the complication and Smart Stack card in sync.
+        WidgetCenter.shared.reloadAllTimelines()
+    }
+}
+
+/// Schedules local notifications 30 minutes before each upcoming tide.
+enum TideAlerts {
+    private static let idPrefix = "puffin-tide-"
+
+    static func setEnabled(_ enabled: Bool, events: [TideEvent]) async {
+        let center = UNUserNotificationCenter.current()
+        await removeAll(center)
+        guard enabled else { return }
+
+        let granted = (try? await center.requestAuthorization(options: [.alert, .sound])) ?? false
+        guard granted else { return }
+
+        for event in events.prefix(4) {
+            let fireIn = event.date.addingTimeInterval(-30 * 60).timeIntervalSinceNow
+            guard fireIn > 0 else { continue }
+            let content = UNMutableNotificationContent()
+            content.title = "\(event.label) tide \(TideFetch.timeString(event.date))"
+            content.body = event.isHigh
+                ? "High water in 30 minutes — a lovely time for a harbour walk."
+                : "Low water in 30 minutes — expect wide sands along the shore."
+            content.sound = .default
+            let trigger = UNTimeIntervalNotificationTrigger(timeInterval: fireIn, repeats: false)
+            let request = UNNotificationRequest(
+                identifier: idPrefix + String(event.date.timeIntervalSince1970),
+                content: content,
+                trigger: trigger
+            )
+            try? await center.add(request)
+        }
+    }
+
+    static func removeAll(_ center: UNUserNotificationCenter) async {
+        let pending = await center.pendingNotificationRequests()
+        let ids = pending.map(\.identifier).filter { $0.hasPrefix(idPrefix) }
+        center.removePendingNotificationRequests(withIdentifiers: ids)
+    }
+}
+
+struct TidePage: View {
+    @State private var model = TideModel()
+    @AppStorage("tideAlertsEnabled") private var alertsEnabled = false
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 8) {
+                WatchPageHeader(icon: "water.waves", title: "Tides")
+                if model.loadFailed {
+                    WatchStatusCard(
+                        icon: "wifi.exclamationmark",
+                        title: "Couldn't load tides",
+                        detail: "Pull down to retry."
+                    )
+                } else if let tide = model.next {
+                    nextTideCard(tide)
+                    todaysCard
+                }
+                alertsCard
+            }
+            .padding(.horizontal, 4)
+        }
+        .background(WatchPageBackground())
+        .task {
+            await model.load()
+            if alertsEnabled {
+                await TideAlerts.setEnabled(true, events: model.upcoming)
+            }
+        }
+        .refreshable { await model.load() }
+        .onChange(of: alertsEnabled) {
+            Task { await TideAlerts.setEnabled(alertsEnabled, events: model.upcoming) }
+        }
+    }
+
+    private func nextTideCard(_ tide: TideEvent) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 5) {
+                Image(systemName: tide.symbolName)
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(tide.isHigh ? WatchTheme.gold : .cyan)
+                Text("NEXT \(tide.label.uppercased()) TIDE")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(.white.opacity(0.55))
+            }
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text(TideFetch.timeString(tide.date))
+                    .font(.system(size: 28, weight: .heavy, design: .rounded))
+                    .foregroundStyle(.white)
+                Text(String(format: "%.1fm", tide.height))
+                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.cyan)
+            }
+            Text(tide.date, style: .relative)
+                .font(.system(size: 12, weight: .bold, design: .monospaced))
+                .foregroundStyle(WatchTheme.mint)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .watchCard()
+    }
+
+    @ViewBuilder
+    private var todaysCard: some View {
+        if !model.todaysTides.isEmpty {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("TODAY")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(.white.opacity(0.55))
+                ForEach(model.todaysTides) { tide in
+                    HStack(spacing: 6) {
+                        Image(systemName: tide.symbolName)
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(tide.isHigh ? WatchTheme.gold : .cyan)
+                        Text(TideFetch.timeString(tide.date))
+                            .font(.system(size: 14, weight: .bold, design: .monospaced))
+                            .foregroundStyle(.white)
+                        Text(tide.label)
+                            .font(.system(size: 11))
+                            .foregroundStyle(.white.opacity(0.7))
+                        Text(String(format: "%.1fm", tide.height))
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(.white.opacity(0.5))
+                        Spacer(minLength: 0)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .watchCard()
+        }
+    }
+
+    private var alertsCard: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "bell.badge")
+                .font(.system(size: 13))
+                .foregroundStyle(WatchTheme.gold)
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Tide alerts")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.white)
+                Text("Ping 30 min before")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.white.opacity(0.55))
+            }
+            Spacer(minLength: 0)
+            Toggle("", isOn: $alertsEnabled)
+                .labelsHidden()
+                .fixedSize()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .watchCard()
+    }
+}
