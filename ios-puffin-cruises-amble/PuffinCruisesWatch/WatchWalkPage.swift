@@ -276,12 +276,12 @@ struct WalkPage: View {
         }
     }
 
-    private var progressDots: some View {
+    private func progressDots(_ currentIndex: Int) -> some View {
         HStack(spacing: 4) {
             ForEach(Array(WalkContent.stops.enumerated()), id: \.element.id) { index, _ in
                 Capsule()
-                    .fill(index <= (model.currentIndex ?? 0) ? WatchTheme.gold : Color.white.opacity(0.2))
-                    .frame(width: index == model.currentIndex ? 14 : 8, height: 4)
+                    .fill(index <= currentIndex ? WatchTheme.gold : Color.white.opacity(0.2))
+                    .frame(width: index == currentIndex ? 14 : 8, height: 4)
                     .animation(.easeInOut(duration: 0.2), value: model.currentIndex)
             }
         }

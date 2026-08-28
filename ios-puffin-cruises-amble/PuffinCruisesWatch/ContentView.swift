@@ -6,14 +6,12 @@ struct ContentView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                // Deep North Sea background
-                Color(red: 0.04, green: 0.15, blue: 0.29)
-                    .ignoresSafeArea()
-
+                WatchPageBackground()
                 ScrollView {
                     VStack(alignment: .leading, spacing: 8) {
                         nextSailingCard
                         todaysSailingsCard
+                        exploreLinks
                     }
                     .padding(.horizontal, 4)
                 }
@@ -29,7 +27,7 @@ struct ContentView: View {
     @ViewBuilder
     private var nextSailingCard: some View {
         if model.loadFailed {
-            statusCard(
+            WatchStatusCard(
                 icon: "wifi.exclamationmark",
                 title: "Couldn't load sailings",
                 detail: "Pull down to retry."
@@ -38,7 +36,7 @@ struct ContentView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text("NEXT SAILING")
                     .font(.system(size: 10, weight: .bold))
-                    .foregroundStyle(Color(red: 0.95, green: 0.72, blue: 0.25))
+                    .foregroundStyle(WatchTheme.gold)
 
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Text(sailing.time)
@@ -55,16 +53,12 @@ struct ContentView: View {
 
                 Text(timerInterval: Date()...date, countsDown: true)
                     .font(.system(size: 13, weight: .bold, design: .monospaced))
-                    .foregroundStyle(.cyan)
+                    .foregroundStyle(WatchTheme.mint)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(10)
-            .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.white.opacity(0.08))
-            )
+            .watchCard()
         } else if !model.isLoading {
-            statusCard(
+            WatchStatusCard(
                 icon: "moon.zzz",
                 title: "No more sailings today",
                 detail: "See you tomorrow!"
@@ -98,31 +92,44 @@ struct ContentView: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(10)
-            .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.white.opacity(0.05))
-            )
+            .watchCard()
         }
     }
 
-    private func statusCard(icon: String, title: String, detail: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Image(systemName: icon)
-                .font(.system(size: 16))
-                .foregroundStyle(Color(red: 0.95, green: 0.72, blue: 0.25))
-            Text(title)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(.white)
-            Text(detail)
-                .font(.system(size: 11))
-                .foregroundStyle(.white.opacity(0.6))
+    // MARK: - Explore links
+
+    private var exploreLinks: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("EXPLORE")
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(.white.opacity(0.55))
+
+            pageLink(destination: TidePage(), icon: "water.waves", label: "Live Tides", tint: WatchTheme.mint)
+            pageLink(destination: BoatPage(), icon: "location.fill", label: "Boat Tracker", tint: WatchTheme.gold)
+            pageLink(destination: WalkPage(), icon: "figure.walk", label: "Harbour Walk", tint: WatchTheme.mint)
+            pageLink(destination: WildlifePage(), icon: "sparkles", label: "Wildlife Spotter", tint: WatchTheme.gold)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(10)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color.white.opacity(0.05))
-        )
+    }
+
+    private func pageLink(destination: some View, icon: String, label: String, tint: Color) -> some View {
+        NavigationLink {
+            destination
+        } label: {
+            HStack(spacing: 7) {
+                Image(systemName: icon)
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(tint)
+                    .frame(width: 18)
+                Text(label)
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(.white)
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(.white.opacity(0.35))
+            }
+            .watchCard()
+        }
+        .buttonStyle(.plain)
     }
 }
