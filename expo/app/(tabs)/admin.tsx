@@ -20,6 +20,7 @@ import {
   QrCode,
   Radio,
   Save,
+  Send,
   ShipWheel,
   ShoppingBag,
   Ticket,
@@ -1155,6 +1156,10 @@ function AdminEditor({
           </View>
         </Section>
 
+        <Section title="Send Push">
+          <SendPushSection />
+        </Section>
+
         <Section title="Notice">
           <TextInput
             value={edited.notice ?? ""}
@@ -1704,6 +1709,126 @@ function WooSection() {
   );
 }
 
+// ── Send Push ─────────────────────────────────────────────────────
+
+function SendPushSection() {
+  const [pushTitle, setPushTitle] = useState("");
+  const [pushBody, setPushBody] = useState("");
+  const [sendingPush, setSendingPush] = useState(false);
+  const [deviceCount, setDeviceCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const { count, error } = await supabase
+          .from("push_tokens")
+          .select("token", { count: "exact", head: true });
+        if (!active) return;
+        if (error) throw error;
+        setDeviceCount(count ?? 0);
+      } catch {
+        if (active) setDeviceCount(0);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const sendPush = async (): Promise<void> => {
+    const title = pushTitle.trim();
+    const body = pushBody.trim();
+    if (!title || !body) {
+      Alert.alert("Missing details", "Add a title and a message first.");
+      return;
+    }
+    setSendingPush(true);
+    try {
+      const { data, error } = await supabase.from("push_tokens").select("token");
+      if (error) throw error;
+      const tokens: string[] = ((data ?? []) as { token: string }[])
+        .map((row) => row.token)
+        .filter(Boolean);
+      if (tokens.length === 0) {
+        Alert.alert("No devices", "No devices have registered for push yet.");
+        return;
+      }
+      for (let i = 0; i < tokens.length; i += 90) {
+        const chunk = tokens.slice(i, i + 90);
+        const res = await fetch("https://exp.host/--/api/v2/push/send", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(
+            chunk.map((token) => ({ to: token, title, body, sound: "default" }))
+          ),
+        });
+        if (!res.ok) throw new Error("Expo push API " + res.status);
+      }
+      setPushTitle("");
+      setPushBody("");
+      Alert.alert(
+        "Sent",
+        "Notification sent to " + tokens.length + " device" + (tokens.length === 1 ? "" : "s") + "."
+      );
+    } catch (err) {
+      console.error("[admin] send push", err);
+      Alert.alert(
+        "Error",
+        "Could not send the push. Check that the push_tokens table exists in Supabase."
+      );
+    } finally {
+      setSendingPush(false);
+    }
+  };
+
+  return (
+    <View style={styles.pushCard}>
+      <View style={styles.pushHeaderRow}>
+        <Send size={18} color={theme.sea} />
+        <Text style={styles.pushHeaderTitle}>Broadcast to all app users</Text>
+      </View>
+      <Text style={styles.pushDeviceCount}>
+        {deviceCount === null
+          ? "Checking devices..."
+          : deviceCount + " registered device" + (deviceCount === 1 ? "" : "s")}
+      </Text>
+      <TextInput
+        value={pushTitle}
+        onChangeText={setPushTitle}
+        placeholder="Title (e.g. Sailing update)"
+        placeholderTextColor={theme.textMuted}
+        style={styles.pushInput}
+        maxLength={60}
+      />
+      <TextInput
+        value={pushBody}
+        onChangeText={setPushBody}
+        placeholder="Message (e.g. The 2pm sailing is running as normal)"
+        placeholderTextColor={theme.textMuted}
+        style={[styles.pushInput, styles.pushInputMultiline]}
+        multiline
+        numberOfLines={3}
+        maxLength={300}
+      />
+      <Pressable
+        onPress={sendPush}
+        disabled={sendingPush}
+        style={[styles.pushSendButton, sendingPush && { opacity: 0.6 }]}
+      >
+        {sendingPush ? (
+          <ActivityIndicator color={theme.white} size="small" />
+        ) : (
+          <Send size={16} color={theme.white} />
+        )}
+        <Text style={styles.pushSendButtonText}>
+          {sendingPush ? "Sending..." : "Send to All Devices"}
+        </Text>
+      </Pressable>
+    </View>
+  );
+}
+
 // ── Shared bits ─────────────────────────────────────────────────────
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -2194,6 +2319,57 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: theme.sea,
     fontFamily: "monospace",
+  },
+  pushCard: {
+    backgroundColor: theme.white,
+    borderWidth: 1,
+    borderColor: theme.border,
+    borderRadius: 18,
+    padding: 14,
+    gap: 10,
+  },
+  pushHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  pushHeaderTitle: {
+    fontSize: 15,
+    fontWeight: "900",
+    color: theme.text,
+  },
+  pushDeviceCount: {
+    fontSize: 12.5,
+    fontWeight: "600",
+    color: theme.textMuted,
+  },
+  pushInput: {
+    backgroundColor: theme.bg,
+    borderWidth: 1,
+    borderColor: theme.border,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: theme.text,
+  },
+  pushInputMultiline: {
+    minHeight: 84,
+    textAlignVertical: "top",
+  },
+  pushSendButton: {
+    backgroundColor: theme.sea,
+    borderRadius: 14,
+    paddingVertical: 13,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  pushSendButtonText: {
+    color: theme.white,
+    fontSize: 15,
+    fontWeight: "800",
   },
   boardedButton: {
     flexDirection: "row",

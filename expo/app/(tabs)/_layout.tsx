@@ -1,9 +1,21 @@
 import { Tabs } from "expo-router";
-import { Anchor, CalendarDays, Compass, Crown, Map, PawPrint, ShoppingBag, Ticket, User, Video } from "lucide-react-native";
+import { Anchor, CalendarDays, Crown, LayoutGrid, Ticket } from "lucide-react-native";
 import React from "react";
 import { Platform } from "react-native";
 
 import { theme } from "@/constants/theme";
+
+const HIDDEN_TAB_SCREENS = [
+  "map",
+  "wildlife",
+  "trip",
+  "tickets",
+  "profile",
+  "cameras",
+  "shop",
+  "gallery",
+  "admin",
+] as const;
 
 export default function TabLayout() {
   return (
@@ -47,41 +59,6 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="map"
-        options={{
-          title: "Map",
-          tabBarIcon: ({ color, size }) => <Map color={color} size={size} />,
-        }}
-      />
-      <Tabs.Screen
-        name="wildlife"
-        options={{
-          title: "Wildlife",
-          tabBarIcon: ({ color, size }) => <PawPrint color={color} size={size} />,
-        }}
-      />
-      <Tabs.Screen
-        name="trip"
-        options={{
-          title: "Trip",
-          tabBarIcon: ({ color, size }) => <Compass color={color} size={size} />,
-        }}
-      />
-      <Tabs.Screen
-        name="tickets"
-        options={{
-          title: "Tickets",
-          tabBarIcon: ({ color, size }) => <Ticket color={color} size={size} />,
-        }}
-      />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: "Profile",
-          tabBarIcon: ({ color, size }) => <User color={color} size={size} />,
-        }}
-      />
-      <Tabs.Screen
         name="membership"
         options={{
           title: "Member",
@@ -89,31 +66,15 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="cameras"
+        name="more"
         options={{
-          title: "Cameras",
-          tabBarIcon: ({ color, size }) => <Video color={color} size={size} />,
+          title: "More",
+          tabBarIcon: ({ color, size }) => <LayoutGrid color={color} size={size} />,
         }}
       />
-      <Tabs.Screen
-        name="shop"
-        options={{
-          title: "Shop",
-          tabBarIcon: ({ color, size }) => <ShoppingBag color={color} size={size} />,
-        }}
-      />
-      <Tabs.Screen
-        name="gallery"
-        options={{
-          href: null,
-        }}
-      />
-      <Tabs.Screen
-        name="admin"
-        options={{
-          href: null,
-        }}
-      />
+      {HIDDEN_TAB_SCREENS.map((name) => (
+        <Tabs.Screen key={name} name={name} options={{ href: null }} />
+      ))}
     </Tabs>
   );
 }

@@ -1,21 +1,69 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as Notifications from "expo-notifications";
+import { Platform } from "react-native";
+
+import { supabase } from "./supabase";
 
 const NOTIFICATIONS_ENABLED_KEY = "@puffin_notifications_enabled";
-const ADMIN_NOTIFICATIONS_ENABLED_KEY = "@puffin_admin_notifications_enabled";
 
-/** OneSignal has been removed; push setup is intentionally disabled. */
-export function initOneSignal(): boolean {
-  return false;
+/**
+ * Configure how notifications behave while the app is open.
+ * Safe to call multiple times.
+ */
+export function configurePushNotifications(): void {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldShowBanner: true,
+      shouldShowList: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+    }),
+  });
 }
 
-/** OneSignal has been removed; notification taps are intentionally disabled. */
-export function onNotificationTap(_callback: () => void): void {
-  // Push notifications removed.
-}
+/**
+ * Ask for notification permission, fetch the Expo push token for this device
+ * and register it in Supabase so the admin can broadcast to all devices.
+ */
+export async function registerForPushNotifications(): Promise<boolean> {
+  const existing = await Notifications.getPermissionsAsync();
+  let granted = existing.granted;
+  if (!granted) {
+    const request = await Notifications.requestPermissionsAsync();
+    granted = request.granted;
+  }
+  if (!granted) return false;
 
-/** OneSignal has been removed; email-to-push linking is intentionally disabled. */
-export function linkEmailToPush(_email: string): void {
-  // Push notifications removed.
+  if (Platform.OS === "android") {
+    await Notifications.setNotificationChannelAsync("default", {
+      name: "Puffin Cruises",
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: "#FF8A3D",
+    });
+  }
+
+  const projectId = process.env.EXPO_PUBLIC_PROJECT_ID;
+  if (!projectId) {
+    console.warn("[push] missing EXPO_PUBLIC_PROJECT_ID; cannot register token");
+    return false;
+  }
+
+  const tokenResponse = await Notifications.getExpoPushTokenAsync({ projectId });
+  const token = tokenResponse.data;
+  if (!token) return false;
+
+  const { error } = await supabase
+    .from("push_tokens")
+    .upsert({ token, platform: Platform.OS }, { onConflict: "token" });
+  if (error) {
+    console.error("[push] token save failed", error.message);
+    return false;
+  }
+
+  await AsyncStorage.setItem(NOTIFICATIONS_ENABLED_KEY, "true");
+  return true;
 }
 
 /** Check if the user has opted into notifications (stored locally). */
@@ -24,20 +72,11 @@ export async function isNotificationsEnabled(): Promise<boolean> {
   return val === "true";
 }
 
-/** Toggle push notifications on/off. */
-export async function setNotificationsEnabled(_enabled: boolean, _email?: string): Promise<boolean> {
-  await AsyncStorage.setItem(NOTIFICATIONS_ENABLED_KEY, "false");
-  return false;
-}
-
-/** Check if this device is enrolled for private admin booking alerts. */
-export async function isAdminNotificationsEnabled(): Promise<boolean> {
-  const val = await AsyncStorage.getItem(ADMIN_NOTIFICATIONS_ENABLED_KEY);
-  return val === "true";
-}
-
-/** Enroll or remove this device from private admin booking alerts. */
-export async function setAdminNotificationsEnabled(_enabled: boolean): Promise<boolean> {
-  await AsyncStorage.setItem(ADMIN_NOTIFICATIONS_ENABLED_KEY, "false");
-  return false;
+/** Ask permission (if needed) and register this device for broadcasts. */
+export async function setNotificationsEnabled(enabled: boolean): Promise<boolean> {
+  if (!enabled) {
+    await AsyncStorage.setItem(NOTIFICATIONS_ENABLED_KEY, "false");
+    return false;
+  }
+  return registerForPushNotifications();
 }

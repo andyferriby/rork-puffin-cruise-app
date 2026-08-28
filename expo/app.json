@@ -47,6 +47,7 @@
           "cameraPermission": "Scan QR codes on boarding passes to check in passengers."
         }
       ],
+      "expo-notifications",
       "expo-font",
       "expo-web-browser",
       "expo-secure-store",
