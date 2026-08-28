@@ -2,11 +2,22 @@ import MapKit
 import SwiftUI
 
 /// "Places to Eat" — crew-managed list from the admin panel, with one-tap
-/// walking directions via Apple Maps.
+/// walking directions via Apple Maps and a favourites tab for top picks.
 struct PlacesToEatView: View {
+    private enum PlacesTab: String, CaseIterable {
+        case all = "All Places"
+        case favourites = "My Favourites"
+    }
+
     @State private var places: [PlaceToEat] = []
     @State private var isLoading = true
     @State private var loadFailed = false
+    @State private var tab: PlacesTab = .all
+    private let favorites = FavoritesStore.shared
+
+    private var visiblePlaces: [PlaceToEat] {
+        tab == .all ? places : places.filter { favorites.isFavorite($0) }
+    }
 
     var body: some View {
         Group {
@@ -27,18 +38,49 @@ struct PlacesToEatView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                ScrollView {
-                    VStack(spacing: 12) {
-                        ForEach(places) { place in
-                            NavigationLink(value: place) {
-                                placeCard(place)
-                            }
-                            .buttonStyle(.plain)
+                VStack(spacing: 12) {
+                    Picker("Tab", selection: $tab) {
+                        ForEach(PlacesTab.allCases, id: \.self) { value in
+                            Text(value.rawValue).tag(value)
                         }
                     }
+                    .pickerStyle(.segmented)
                     .padding(.horizontal, 16)
-                    .padding(.bottom, 32)
+
+                    if visiblePlaces.isEmpty {
+                        VStack(spacing: 12) {
+                            Image(systemName: "heart")
+                                .font(.system(size: 44))
+                                .foregroundStyle(Theme.textMuted)
+                            Text("No favourites yet")
+                                .font(.system(size: 16, weight: .bold))
+                                .foregroundStyle(Theme.text)
+                            Text("Tap the heart on a place to save it here.")
+                                .font(.system(size: 13))
+                                .foregroundStyle(Theme.textMuted)
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else {
+                        ScrollView {
+                            VStack(spacing: 12) {
+                                ForEach(visiblePlaces) { place in
+                                    NavigationLink(value: place) {
+                                        placeCard(place)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .overlay(alignment: .topTrailing) {
+                                        heartButton(place)
+                                    }
+                                }
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.top, 2)
+                            .padding(.bottom, 32)
+                            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: favorites.favoriteIDs)
+                        }
+                    }
                 }
+                .padding(.top, 8)
             }
         }
         .background(Theme.bg)
@@ -49,6 +91,30 @@ struct PlacesToEatView: View {
         .navigationDestination(for: PlaceToEat.self) { place in
             PlaceDetailView(place: place)
         }
+    }
+
+    /// Heart toggle, laid over the card so the tap never triggers navigation.
+    private func heartButton(_ place: PlaceToEat) -> some View {
+        let isFavorite = favorites.isFavorite(place)
+        return Button {
+            favorites.toggle(place)
+        } label: {
+            Image(systemName: isFavorite ? "heart.fill" : "heart")
+                .font(.system(size: 15, weight: .bold))
+                .foregroundStyle(isFavorite ? Theme.coral : Theme.sea)
+                .frame(width: 38, height: 38)
+                .background(.white.opacity(0.92))
+                .clipShape(Circle())
+                .overlay {
+                    Circle().stroke(Theme.border, lineWidth: 1)
+                }
+                .shadow(color: .black.opacity(0.08), radius: 4, y: 1)
+                .scaleEffect(isFavorite ? 1.0 : 0.95)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(isFavorite ? "Remove from favourites" : "Add to favourites")
+        .padding(.top, 6)
+        .padding(.trailing, 10)
     }
 
     private func load() async {
@@ -114,6 +180,7 @@ struct PlacesToEatView: View {
 /// Detail for a single place: info, call, website and walking directions.
 struct PlaceDetailView: View {
     let place: PlaceToEat
+    private let favorites = FavoritesStore.shared
 
     private var directionsURL: URL? {
         URL(string: "https://maps.apple.com/?daddr=\(place.latitude),\(place.longitude)&dirflg=w")
@@ -215,5 +282,17 @@ struct PlaceDetailView: View {
         .background(Theme.bg)
         .navigationTitle(place.name)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    favorites.toggle(place)
+                } label: {
+                    Image(systemName: favorites.isFavorite(place) ? "heart.fill" : "heart")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(favorites.isFavorite(place) ? Theme.coral : Theme.sea)
+                }
+                .accessibilityLabel(favorites.isFavorite(place) ? "Remove from favourites" : "Add to favourites")
+            }
+        }
     }
 }
