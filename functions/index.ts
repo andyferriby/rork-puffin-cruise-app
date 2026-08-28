@@ -5,7 +5,7 @@ import { Buffer } from "node:buffer";
 
 const STRIPE_TIMESTAMP_TOLERANCE_SEC = 300;
 
-// Push notifications were removed from the mobile app to avoid the OneSignal extension/signing flow.
+// Expo push is sent client-side; native APNs tokens go through /push/apns, signed with the team's .p8 key.
 
 type Env = {
   STRIPE_SECRET_KEY: string;
@@ -22,6 +22,8 @@ type Env = {
   APPLE_WWDR_PEM?: string;
   RESEND_API_KEY?: string;
   RESEND_FROM_EMAIL?: string;
+  APNS_KEY_P8?: string;
+  APNS_KEY_ID?: string;
 };
 
 const APPLE_PASS_TYPE_ID = "pass.com.puffincruises.boarding";
@@ -723,6 +725,112 @@ async function handleWooProducts(request: Request, _env: Env): Promise<Response>
   }
 }
 
+
+// ── APNs Broadcast (native iOS app) ─────────────────────────────
+
+const APNS_BUNDLE_ID = "app.rork.in0r796f9fdds07w9xb7v";
+// Dev-signed builds register on the sandbox host; App Store/TestFlight on production.
+const APNS_HOSTS = ["https://api.push.apple.com", "https://api.sandbox.push.apple.com"];
+
+function base64Url(value: Uint8Array | string): string {
+  const binary = typeof value === "string" ? btoa(value) : btoa(String.fromCharCode(...value));
+  return binary.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function pemToPkcs8(pem: string): Uint8Array {
+  const base64 = pem.replace(/-----(BEGIN|END) PRIVATE KEY-----/g, "").replace(/\s+/g, "");
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+// WebCrypto emits DER-encoded ECDSA signatures; APNs expects raw 64-byte r||s.
+function derSignatureToRaw(der: Uint8Array): Uint8Array {
+  let offset = 2;
+  const readInteger = (): Uint8Array => {
+    const length = der[offset + 1];
+    let value = der.slice(offset + 2, offset + 2 + length);
+    offset += 2 + length;
+    if (value.length > 32) value = value.slice(value.length - 32);
+    const padded = new Uint8Array(32);
+    padded.set(value, 32 - value.length);
+    return padded;
+  };
+  const raw = new Uint8Array(64);
+  raw.set(readInteger(), 0);
+  raw.set(readInteger(), 32);
+  return raw;
+}
+
+async function apnsProviderToken(env: Env): Promise<string> {
+  const header = base64Url(JSON.stringify({ alg: "ES256", kid: env.APNS_KEY_ID }));
+  const payload = base64Url(JSON.stringify({ iss: APPLE_TEAM_ID, iat: Math.floor(Date.now() / 1000) }));
+  const signingInput = `${header}.${payload}`;
+  const key = await crypto.subtle.importKey(
+    "pkcs8",
+    pemToPkcs8(env.APNS_KEY_P8!),
+    { name: "ECDSA", namedCurve: "P-256" },
+    false,
+    ["sign"],
+  );
+  const signature = new Uint8Array(
+    await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, key, new TextEncoder().encode(signingInput)),
+  );
+  return `${signingInput}.${base64Url(derSignatureToRaw(signature))}`;
+}
+
+async function handleApnsBroadcast(request: Request, env: Env): Promise<Response> {
+  if (!env.APNS_KEY_P8 || !env.APNS_KEY_ID) {
+    return json({ error: "apns_not_configured" }, { status: 501 });
+  }
+  const payload = (await request.json()) as { title?: string; body?: string };
+  const title = (payload.title ?? "").trim();
+  const body = (payload.body ?? "").trim();
+  if (!title || !body) return json({ error: "missing_title_or_body" }, { status: 400 });
+
+  const tokenResponse = await supa(env, "/push_tokens?select=token&platform=eq.ios-apns", { method: "GET" });
+  if (!tokenResponse.ok) return json({ error: "token_fetch_failed" }, { status: 502 });
+  const rows = (await tokenResponse.json()) as { token: string }[];
+  const tokens = rows.map((row) => row.token).filter(Boolean);
+  if (tokens.length === 0) return json({ sent: 0, failed: 0, total: 0 });
+
+  const providerToken = await apnsProviderToken(env);
+  const alertBody = JSON.stringify({ aps: { alert: { title, body }, sound: "default" } });
+  let sent = 0;
+  let failed = 0;
+
+  for (const deviceToken of tokens) {
+    let delivered = false;
+    for (const host of APNS_HOSTS) {
+      try {
+        const res = await fetch(`${host}/3/device/${deviceToken}`, {
+          method: "POST",
+          headers: {
+            authorization: `bearer ${providerToken}`,
+            "apns-topic": APNS_BUNDLE_ID,
+            "apns-push-type": "alert",
+            "apns-priority": "10",
+          },
+          body: alertBody,
+        });
+        if (res.ok) {
+          delivered = true;
+          break;
+        }
+        const detail = await res.text();
+        console.error("[apns] rejected", res.status, detail);
+        if (!detail.includes("BadDeviceToken")) break;
+      } catch (err) {
+        console.error("[apns] send error", err);
+      }
+    }
+    if (delivered) sent += 1;
+    else failed += 1;
+  }
+  return json({ sent, failed, total: tokens.length });
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
@@ -781,6 +889,15 @@ export default {
       } catch (err) {
         console.error("woocommerce error", err);
         return json({ error: "woocommerce_error" }, { status: 500 });
+      }
+    }
+
+    if (url.pathname === "/push/apns" && request.method === "POST") {
+      try {
+        return await handleApnsBroadcast(request, env);
+      } catch (err) {
+        console.error("apns error", err);
+        return json({ error: "apns_error" }, { status: 500 });
       }
     }
 

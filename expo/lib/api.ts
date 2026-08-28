@@ -33,3 +33,23 @@ export async function createCheckout(body: CreateCheckoutBody): Promise<CreateCh
   }
   return (await res.json()) as CreateCheckoutResponse;
 }
+
+export type ApnsBroadcastResponse = {
+  sent: number;
+  failed: number;
+  total: number;
+};
+
+/** Sends to native iOS devices (APNs) via the backend's .p8 signing relay. */
+export async function sendApnsBroadcast(title: string, body: string): Promise<ApnsBroadcastResponse> {
+  const res = await fetch(`${BASE}/push/apns`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ title, body }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`APNs broadcast failed: ${res.status} ${text}`);
+  }
+  return (await res.json()) as ApnsBroadcastResponse;
+}

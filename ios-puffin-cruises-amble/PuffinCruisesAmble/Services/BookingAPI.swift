@@ -154,25 +154,52 @@ enum BookingAPI {
         }
     }
 
-    /// Broadcasts a push notification to every Expo device via Expo's push API.
-    /// Native APNs tokens are skipped — those need the APNs key relay described in
-    /// the push setup notes (Expo's API only accepts Expo push tokens).
+    /// Broadcasts a push to every registered device: Expo tokens go via Expo's
+    /// push API; native APNs tokens go through the backend's .p8 signing relay.
     static func sendBroadcastPush(title: String, body: String) async throws -> Int {
-        let tokens = await SupabaseService.fetchPushTokens().filter { $0.hasPrefix("Expo") }
-        guard !tokens.isEmpty else { return 0 }
-        guard let url = URL(string: "https://exp.host/--/api/v2/push/send") else { return 0 }
+        let tokens = await SupabaseService.fetchPushTokens()
+        let expoTokens = tokens.filter { $0.hasPrefix("Expo") }
+        var delivered = 0
 
-        for chunk in stride(from: 0, to: tokens.count, by: 90).map({ Array(tokens[$0..<min($0 + 90, tokens.count)]) }) {
-            let messages = chunk.map { PushMessage(to: $0, title: title, body: body, sound: "default") }
-            var request = URLRequest(url: url)
-            request.httpMethod = "POST"
-            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            request.httpBody = try JSONEncoder().encode(messages)
-            let (_, response) = try await URLSession.shared.data(for: request)
-            if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
-                throw BookingAPIError.failed("Push service returned \(http.statusCode)")
+        if !expoTokens.isEmpty {
+            guard let url = URL(string: "https://exp.host/--/api/v2/push/send") else { return 0 }
+            for chunk in stride(from: 0, to: expoTokens.count, by: 90).map({ Array(expoTokens[$0..<min($0 + 90, expoTokens.count)]) }) {
+                let messages = chunk.map { PushMessage(to: $0, title: title, body: body, sound: "default") }
+                var request = URLRequest(url: url)
+                request.httpMethod = "POST"
+                request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                request.httpBody = try JSONEncoder().encode(messages)
+                let (_, response) = try await URLSession.shared.data(for: request)
+                if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
+                    throw BookingAPIError.failed("Push service returned \(http.statusCode)")
+                }
             }
+            delivered += expoTokens.count
         }
-        return tokens.count
+
+        delivered += await sendApnsBroadcast(title: title, body: body)
+        return delivered
+    }
+
+    /// Native APNs devices are sent via the Cloudflare function, which signs
+    /// requests with the team's APNs key server-side.
+    private static func sendApnsBroadcast(title: String, body: String) async -> Int {
+        guard let url = URL(string: "\(base)/push/apns") else { return 0 }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try? JSONEncoder().encode(["title": title, "body": body])
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+                print("[push] apns relay rejected")
+                return 0
+            }
+            struct ApnsResult: Decodable { let sent: Int }
+            return (try? JSONDecoder().decode(ApnsResult.self, from: data))?.sent ?? 0
+        } catch {
+            print("[push] apns relay error: \(error.localizedDescription)")
+            return 0
+        }
     }
 }

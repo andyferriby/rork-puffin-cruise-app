@@ -48,6 +48,7 @@ import { spacing, theme } from "@/constants/theme";
 import { fetchSchedule, type Cruise, type DaySchedule, type ScheduleConfig } from "@/lib/schedule";
 import { fetchBoatLocation, saveBoatLocation, stopBoatTracking, type BoatLocation } from "@/lib/boatTracker";
 import { supabase } from "@/lib/supabase";
+import { sendApnsBroadcast } from "@/lib/api";
 
 const ADMIN_PIN_KEY = "@puffin_admin_pin";
 const PREPRINTED_TICKET_QR_VALUE = "PUFFIN_SHOP_TICKET_BOARDING";
@@ -1745,17 +1746,18 @@ function SendPushSection() {
     }
     setSendingPush(true);
     try {
-      const { data, error } = await supabase.from("push_tokens").select("token");
+      const { data, error } = await supabase.from("push_tokens").select("token, platform");
       if (error) throw error;
-      const tokens: string[] = ((data ?? []) as { token: string }[])
-        .map((row) => row.token)
-        .filter(Boolean);
-      if (tokens.length === 0) {
+      const rows = ((data ?? []) as { token: string; platform: string | null }[]).filter((row) => row.token);
+      if (rows.length === 0) {
         Alert.alert("No devices", "No devices have registered for push yet.");
         return;
       }
-      for (let i = 0; i < tokens.length; i += 90) {
-        const chunk = tokens.slice(i, i + 90);
+      const expoTokens = rows
+        .filter((row) => row.token.startsWith("Expo"))
+        .map((row) => row.token);
+      for (let i = 0; i < expoTokens.length; i += 90) {
+        const chunk = expoTokens.slice(i, i + 90);
         const res = await fetch("https://exp.host/--/api/v2/push/send", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -1765,11 +1767,19 @@ function SendPushSection() {
         });
         if (!res.ok) throw new Error("Expo push API " + res.status);
       }
+      let apnsSent = 0;
+      try {
+        apnsSent = (await sendApnsBroadcast(title, body)).sent;
+      } catch (apnsErr) {
+        console.error("[admin] apns broadcast", apnsErr);
+        if (expoTokens.length === 0) throw apnsErr;
+      }
+      const delivered = expoTokens.length + apnsSent;
       setPushTitle("");
       setPushBody("");
       Alert.alert(
         "Sent",
-        "Notification sent to " + tokens.length + " device" + (tokens.length === 1 ? "" : "s") + "."
+        "Notification sent to " + delivered + " device" + (delivered === 1 ? "" : "s") + "."
       );
     } catch (err) {
       console.error("[admin] send push", err);
