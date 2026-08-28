@@ -8,6 +8,8 @@ export type BoatLocation = {
   speed: number | null;
   updatedAt: string;
   isTracking: boolean;
+  /** When true, crew has hidden the live position from customer apps (private charter). */
+  isHidden?: boolean;
 };
 
 const BOAT_LOCATION_KEY = "boat_location";
@@ -56,6 +58,7 @@ export async function stopBoatTracking(lastLocation: BoatLocation | null): Promi
     speed: lastLocation?.speed ?? null,
     updatedAt: new Date().toISOString(),
     isTracking: false,
+    isHidden: lastLocation?.isHidden,
   };
 
   await saveBoatLocation(stoppedLocation);

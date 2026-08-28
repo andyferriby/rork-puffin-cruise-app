@@ -44,7 +44,8 @@ struct HarbourMapView: View {
         filter == "All" ? places : places.filter { $0.category == filter }
     }
 
-    private var isBoatLive: Bool { boat?.isTracking == true }
+    private var isBoatHidden: Bool { boat?.isHidden == true }
+    private var isBoatLive: Bool { boat?.isTracking == true && !isBoatHidden }
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -72,7 +73,7 @@ struct HarbourMapView: View {
                     }
                 }
 
-                if let boat, boat.isTracking {
+                if let boat, boat.isTracking, !isBoatHidden {
                     Annotation("Puffin Cruiser", coordinate: .init(latitude: boat.latitude, longitude: boat.longitude)) {
                         ZStack {
                             Circle().fill(Theme.coral.opacity(0.25)).frame(width: 46, height: 46)
@@ -92,10 +93,10 @@ struct HarbourMapView: View {
 
             VStack(spacing: 10) {
                 HStack(spacing: 8) {
-                    Image(systemName: "dot.radiowaves.left.and.right")
+                    Image(systemName: isBoatHidden ? "eye.slash" : "dot.radiowaves.left.and.right")
                         .font(.system(size: 13, weight: .bold))
                         .foregroundStyle(isBoatLive ? Theme.coral : Theme.textMuted)
-                    Text(isBoatLive ? "Boat tracking live" : "Boat not sailing right now")
+                    Text(isBoatHidden ? "Live tracking hidden for a private charter" : isBoatLive ? "Boat tracking live" : "Boat not sailing right now")
                         .font(.system(size: 13, weight: .bold))
                         .foregroundStyle(Theme.text)
                     Spacer()

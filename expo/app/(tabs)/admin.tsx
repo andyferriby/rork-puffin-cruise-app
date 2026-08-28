@@ -11,6 +11,7 @@ import {
   Calendar,
   CheckCircle,
   Clock,
+  EyeOff,
   Key,
   Lock,
   LogOut,
@@ -341,6 +342,7 @@ function AdminEditor({
     queryFn: fetchBoatLocation,
     refetchInterval: 15000,
   });
+  const trackerHidden = Boolean(boatLocation?.isHidden);
 
   const [edited, setEdited] = useState<ScheduleConfig | null>(null);
   const [hasChanges, setHasChanges] = useState<boolean>(false);
@@ -663,10 +665,11 @@ function AdminEditor({
       speed: position.coords.speed ?? null,
       updatedAt: new Date().toISOString(),
       isTracking: true,
+      isHidden: boatLocation?.isHidden ?? false,
     };
     await saveBoatLocation(nextLocation);
     qc.invalidateQueries({ queryKey: ["boat-location"] });
-  }, [qc]);
+  }, [qc, boatLocation]);
 
   const handleStartTracking = useCallback(async () => {
     setIsTrackingBoat(true);
@@ -699,6 +702,31 @@ function AdminEditor({
       setTrackingError("Could not stop tracking. Please try again.");
     }
   }, [boatLocation, qc]);
+
+  const [hidingTracker, setHidingTracker] = useState<boolean>(false);
+  const handleToggleTrackerHidden = useCallback(async () => {
+    setHidingTracker(true);
+    try {
+      const latest = await fetchBoatLocation();
+      const base: BoatLocation = latest ?? {
+        latitude: 55.3338,
+        longitude: -1.5803,
+        accuracy: null,
+        heading: null,
+        speed: null,
+        updatedAt: new Date().toISOString(),
+        isTracking: false,
+      };
+      await saveBoatLocation({ ...base, isHidden: !trackerHidden });
+      qc.invalidateQueries({ queryKey: ["boat-location"] });
+      if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch (err) {
+      console.error("[admin] toggle tracker hidden", err);
+      setTrackingError("Could not update tracker visibility. Please try again.");
+    } finally {
+      setHidingTracker(false);
+    }
+  }, [qc, trackerHidden]);
 
   const [resettingBoarded, setResettingBoarded] = useState<boolean>(false);
   const handleResetBoarded = useCallback(() => {
@@ -804,6 +832,32 @@ function AdminEditor({
             <Text style={styles.trackerNote}>
               Keep this screen open during the trip for live updates every 20 seconds.
             </Text>
+            <View style={[styles.hideRow, trackerHidden && styles.hideRowActive]}>
+              <View style={[styles.hideRowIcon, trackerHidden && styles.hideRowIconActive]}>
+                <EyeOff size={16} color={trackerHidden ? theme.white : theme.textMuted} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.hideRowTitle, trackerHidden && styles.hideRowTitleOn]}>
+                  {trackerHidden ? "Location hidden from customers" : "Hide location from customers"}
+                </Text>
+                <Text style={[styles.hideRowSub, trackerHidden && styles.hideRowSubOn]}>
+                  {trackerHidden
+                    ? "Customers can't see the boat. Tap the switch to show it again."
+                    : "For private charters — hides the live boat from customer maps."}
+                </Text>
+              </View>
+              {hidingTracker ? (
+                <ActivityIndicator color={theme.sea} size="small" />
+              ) : (
+                <Pressable
+                  onPress={handleToggleTrackerHidden}
+                  hitSlop={8}
+                  style={[styles.hideSwitch, trackerHidden && styles.hideSwitchOn]}
+                >
+                  <View style={[styles.hideKnob, trackerHidden && styles.hideKnobOn]} />
+                </Pressable>
+              )}
+            </View>
           </View>
         </Section>
 
@@ -2148,6 +2202,51 @@ const styles = StyleSheet.create({
   },
   pingButtonText: { color: theme.sea, fontWeight: "800", fontSize: 13 },
   trackerNote: { color: theme.textMuted, fontSize: 12, lineHeight: 17 },
+  hideRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 12,
+    borderRadius: 14,
+    backgroundColor: theme.bg,
+    borderWidth: 1,
+    borderColor: theme.border,
+  },
+  hideRowActive: { backgroundColor: theme.deep, borderColor: theme.deep },
+  hideRowIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 11,
+    backgroundColor: theme.foam,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  hideRowIconActive: { backgroundColor: theme.coral },
+  hideRowTitle: { fontSize: 14, fontWeight: "800", color: theme.text },
+  hideRowTitleOn: { color: theme.white },
+  hideRowSub: { marginTop: 2, fontSize: 12, lineHeight: 16, color: theme.textMuted },
+  hideRowSubOn: { color: "rgba(255,255,255,0.65)" },
+  hideSwitch: {
+    width: 46,
+    height: 27,
+    borderRadius: 14,
+    backgroundColor: "#D8E1EA",
+    justifyContent: "center",
+    paddingHorizontal: 3,
+  },
+  hideSwitchOn: { backgroundColor: theme.coral },
+  hideKnob: {
+    width: 21,
+    height: 21,
+    borderRadius: 11,
+    backgroundColor: theme.white,
+    shadowColor: "#000",
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 2,
+  },
+  hideKnobOn: { alignSelf: "flex-end" },
 
   footer: {
     flexDirection: "row",

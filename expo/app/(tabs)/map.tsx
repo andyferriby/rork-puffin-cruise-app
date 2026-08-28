@@ -112,7 +112,9 @@ export default function MapScreen() {
     queryFn: fetchBoatLocation,
     refetchInterval: 15000,
   });
-  const isBoatLive = Boolean(boatLocation?.isTracking);
+  const isBoatHidden = Boolean(boatLocation?.isHidden);
+  const isBoatLive =
+    Boolean(boatLocation?.isTracking) && !isBoatHidden;
 
   const visible = places.filter(
     (p) => filter === "All" || p.category === filter,
@@ -141,7 +143,7 @@ export default function MapScreen() {
   };
 
   const focusBoat = () => {
-    if (!boatLocation) return;
+    if (!boatLocation || isBoatHidden) return;
     mapRef.current?.animateToRegion(
       {
         latitude: boatLocation.latitude,
@@ -216,7 +218,7 @@ export default function MapScreen() {
               </Marker>
             ))}
 
-            {boatLocation && (
+            {boatLocation && !isBoatHidden && (
               <Marker
                 identifier="live-boat"
                 coordinate={{
@@ -249,12 +251,18 @@ export default function MapScreen() {
               {isBoatLive ? <Radio size={18} color={theme.white} /> : <ShipWheel size={18} color={theme.sea} />}
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.boatStatusTitle}>{isBoatLive ? "Boat is live on the water" : "Boat tracking is paused"}</Text>
+              <Text style={styles.boatStatusTitle}>
+                {isBoatHidden ? "Tracker temporarily hidden" : isBoatLive ? "Boat is live on the water" : "Boat tracking is paused"}
+              </Text>
               <Text style={styles.boatStatusSub}>
-                {boatUpdatedLabel ? `Last position update ${boatUpdatedLabel}` : "Waiting for crew to start tracking"}
+                {isBoatHidden
+                  ? "The crew has hidden live tracking for a private charter."
+                  : boatUpdatedLabel
+                    ? `Last position update ${boatUpdatedLabel}`
+                    : "Waiting for crew to start tracking"}
               </Text>
             </View>
-            <Text style={styles.boatStatusAction}>View</Text>
+            {!isBoatHidden && <Text style={styles.boatStatusAction}>View</Text>}
           </Pressable>
         )}
 

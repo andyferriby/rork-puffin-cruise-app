@@ -8,6 +8,7 @@ nonisolated struct WatchBoatLocation: Decodable, Hashable {
     let speed: Double?
     let updatedAt: String
     let isTracking: Bool
+    let isHidden: Bool?
 }
 
 /// Reads the crew-updated boat position from the same Supabase app_config
@@ -95,6 +96,12 @@ struct BoatPage: View {
                         icon: "antenna.radiowaves.left.and.right.slash",
                         title: "No live position",
                         detail: "The crew's tracker isn't broadcasting right now."
+                    )
+                } else if model.location?.isHidden == true {
+                    WatchStatusCard(
+                        icon: "eye.slash",
+                        title: "Position hidden",
+                        detail: "The crew has hidden live tracking for a private charter."
                     )
                 } else if let location = model.location, let coordinate = model.coordinate {
                     mapCard(coordinate)

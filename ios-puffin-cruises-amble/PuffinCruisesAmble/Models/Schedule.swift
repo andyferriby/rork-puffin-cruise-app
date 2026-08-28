@@ -92,6 +92,8 @@ nonisolated struct BoatLocation: Codable, Hashable {
     var speed: Double?
     var updatedAt: String
     var isTracking: Bool
+    /// When true, crew has hidden the live position from customer apps (private charter).
+    var isHidden: Bool?
 }
 
 nonisolated struct CameraVideo: Codable, Identifiable, Hashable {
